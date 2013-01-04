@@ -37,7 +37,7 @@ public class TravSalesJob extends Configured {
     private static float survivorProportion = 0.3f;
     private static float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static int generations = 500;
+    private static int generations = 1;
 
 
     public static void main(String[] args) throws Exception {
