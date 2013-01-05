@@ -44,6 +44,7 @@ public class TravSalesJob extends Configured {
         Configuration conf = new Configuration();
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 
+        // TODO make it so the folder is new each time
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
         conf.set("cities", roadmap);
@@ -74,7 +75,8 @@ public class TravSalesJob extends Configured {
     }
 
 
-    protected static void selectAndReproduce(int generation, String roadmap) throws IOException, InterruptedException, ClassNotFoundException {
+    protected static void selectAndReproduce(int generation, String roadmap)
+    		throws IOException, InterruptedException, ClassNotFoundException {
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
@@ -89,7 +91,6 @@ public class TravSalesJob extends Configured {
 
         job.setJarByClass(TravSalesJob.class);
         job.setMapperClass(SelectionBinMapper.class);
-        // job.setCombinerClass(ScoringPassthruReducer.class);
         job.setReducerClass(SelectionReproductionReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
@@ -116,7 +117,8 @@ public class TravSalesJob extends Configured {
         return roadmap;
     }
 
-    protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, final int numCitiesIgnored) throws IOException {
+    protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, 
+    		final int numCitiesIgnored) throws IOException {
         ArrayList<double[]> roadmap = new ArrayList<double[]>(20);
         for (int i = 0; i < 5; ++i) {
             double dummy = 0.2 * (double)i;
@@ -142,7 +144,8 @@ public class TravSalesJob extends Configured {
         return configStringBuilder.toString();
     }
 
-    protected static String createRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, final int numCities) throws IOException {
+    protected static String createRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, 
+    		final int numCities) throws IOException {
         ArrayList<double[]> roadmap = createMap(numCities);
         StringBuilder configStringBuilder = new StringBuilder("");
         for (int i = 0; i < roadmap.size(); ++i) {
@@ -160,8 +163,10 @@ public class TravSalesJob extends Configured {
         return configStringBuilder.toString();
     }
 
-    protected static void createInitialPopulation(FSDataOutputStream populationOutfile, final int populationSize, final int numCities) throws IOException {
-        for (int i = 0; i < populationSize; ++i) {
+    protected static void createInitialPopulation(FSDataOutputStream populationOutfile, 
+    		final int populationSize, final int numCities) throws IOException {
+        // Could create good initial solution using what the paper was chatting about graphs least tree or something
+    	for (int i = 0; i < populationSize; ++i) {
             for (int j = 0; j < (numCities - 1); ++j) {
                 if (j > 0) {
                     populationOutfile.writeBytes(" ");
