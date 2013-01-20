@@ -5,21 +5,19 @@
 package org.bradheintz.travsales;
 
 import java.io.IOException;
-import java.util.ArrayList;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.Mapper.Context;
-import org.apache.log4j.Logger;
 
 /**
+ * Class dedicated to scoring the initial population
  *
  * @author bradheintz
  */
 public class ScoringMapper extends Mapper<LongWritable, Text, Text, DoubleWritable> {
-    private final static Logger log = Logger.getLogger(ScoringMapper.class);
 
     private Text outKey = new Text();
     private DoubleWritable outValue = new DoubleWritable();

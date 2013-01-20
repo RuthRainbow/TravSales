@@ -9,17 +9,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.apache.log4j.Logger;
-import org.bradheintz.travsales.SelectionReproductionReducer.ScoredChromosome;
 
 /**
  *
@@ -27,200 +27,282 @@ import org.bradheintz.travsales.SelectionReproductionReducer.ScoredChromosome;
  */
 public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
 
-    private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
-    private double survivorProportion;
-    private double topTierProportion;
-    private int desiredPopulationSize;
-    protected double sideEffectSum = 0.0;
-    protected double mutationChance = 0.01;
-    protected Random random = new Random();
-    protected ChromosomeScorer scorer;
-    private Text outKey = new Text();
-    private DoubleWritable outValue = new DoubleWritable();
+	private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
+	private double survivorProportion;
+	private double topTierProportion;
+	private int desiredPopulationSize;
+	protected double sideEffectSum = 0.0;
+	protected double mutationChance = 0.01;
+	protected Random random = new Random();
+	protected ChromosomeScorer scorer;
+	private Text outKey = new Text();
+	private DoubleWritable outValue = new DoubleWritable();
 
-    static class ScoredChromosome {
+	static class ScoredChromosome {
 
-        String chromosome;
-        String[] chromosomeArray = null;
-        Double score;
-        double accumulatedNormalizedScore = -1.0;
+		String chromosome;
+		String[] chromosomeArray = null;
+		Double score;
+		double accumulatedNormalizedScore = -1.0;
 
-        ScoredChromosome() {
-            chromosome = "";
-            score = -1.0;
-        }
+		ScoredChromosome() {
+			chromosome = "";
+			score = -1.0;
+		}
 
-        ScoredChromosome(Text testText) {
-            String[] fields = testText.toString().split("\t");
-            chromosome = fields[0];
-            score = Double.parseDouble(fields[1]);
-        }
+		ScoredChromosome(Text testText) {
+			String[] fields = testText.toString().split("\t");
+			chromosome = fields[0];
+			score = Double.parseDouble(fields[1]);
+		}
 
-        String[] getChromosomeArray() {
-            if (chromosomeArray == null) {
-                chromosomeArray = chromosome.split(" ");
-            }
-            return chromosomeArray;
-        }
+		String[] getChromosomeArray() {
+			if (chromosomeArray == null) {
+				chromosomeArray = chromosome.split(" ");
+			}
+			return chromosomeArray;
+		}
 
-        void setGene(int geneToSet, int newValue) {
-            // TODO boundary checks
-            getChromosomeArray()[geneToSet] = Integer.toString(newValue);
-            StringBuilder newChromosome = new StringBuilder();
-            for (int j = 0; j < getChromosomeArray().length; ++j) {
-                newChromosome.append(getChromosomeArray()[j]);
-                newChromosome.append(" ");
-            }
-            chromosome = newChromosome.toString().trim();
-        }
-    }
+		void setGene(int geneToSet, int newValue) {
+			// TODO boundary checks
+			getChromosomeArray()[geneToSet] = Integer.toString(newValue);
+			StringBuilder newChromosome = new StringBuilder();
+			for (int j = 0; j < getChromosomeArray().length; ++j) {
+				newChromosome.append(getChromosomeArray()[j]);
+				newChromosome.append(" ");
+			}
+			chromosome = newChromosome.toString().trim();
+		}
+	}
 
-    @Override
-    protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-        TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
-        normalizeScores(sortedChromosomes);
+	@Override
+	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+		//Want to embed this to split again then reduce again
+		System.out.println("IN THE REDUCE");
+		generateSurvivors(values, context);
+	}
 
-        int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
-        Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
+	private void generateSurvivors(Iterable<Text> values, Context context) throws InterruptedException, IOException {
+		// Want to do inner reduce before the values are sorted. Need to split iterable into parts
+		//- have to iterate over. Don't know the number of values :(
+		List<ScoredChromosome> reducedVals = new ArrayList<ScoredChromosome>();
 
-//        int topTier = (int)((double)sortedChromosomes.size() * topTierProportion);
-//        while (survivors.size() < topTier) {
-//            need a reverse iterator or something
-//        }
+		int numValues = 9995;
+		/*for (Text text : values) {
+			numValues++;
+		}*/
+		System.out.println("NUM VALUES IS " + numValues);
 
-        while (survivors.size() < survivorsWanted) {
-            survivors.add(selectSurvivor(sortedChromosomes));
-        }
+		int numSubsets = 5;
+		int valuesPerSubset = (int) Math.floor(numValues/numSubsets);
+		int nextSubset = valuesPerSubset;
+		List<ScoredChromosome> currSubset = new ArrayList<ScoredChromosome>();
+		System.out.println(valuesPerSubset + " per subset");
 
-        // TODO just use survivors for newPopulation - why not?  avoid dupes, save making another collection
-        ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
+		for (Text value : values) {
+			ScoredChromosome sc = new ScoredChromosome(value);
+			currSubset.add(sc);
+			if (currSubset.size() > nextSubset) {
+				System.out.println(currSubset.size() + " > " + nextSubset);
+				int tmp = nextSubset + valuesPerSubset;
+				if (numValues - tmp >= valuesPerSubset) {
+					reducedVals.addAll(innerReduce(currSubset));
+					currSubset.clear();
+					nextSubset += valuesPerSubset;
+				} else {
+					nextSubset += numValues % numSubsets;
+				}
+			}
+		}
+		
+		System.out.println("REDUCED VALS SIZE IS " + reducedVals.size());
 
-        while (survivors.size() < desiredPopulationSize) {
-            survivors.add(makeOffspring(parentPool));
-        }
+		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(reducedVals);
+		normalizeScores(sortedChromosomes);
 
-        Iterator<ScoredChromosome> iter = survivors.iterator();
-        while (iter.hasNext()) {
-            ScoredChromosome sc = iter.next();
-            outKey.set(sc.chromosome);
-            outValue.set(sc.score);
-            context.write(outKey, outValue);
-        }
-    }
+		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
+		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
-    @Override
-    protected void setup(Context context) throws IOException, InterruptedException {
-        super.setup(context);
-        Configuration config = context.getConfiguration();
-        survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
-        topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
-        desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
-        mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
-        if (config.get("cities") == null) {
-            throw new InterruptedException("Failure! No city map.");
-        }
-        scorer = new ChromosomeScorer(config.get("cities"));
-        if (scorer.cities.size() < 3) {
-            throw new InterruptedException("Failure! Invalid city map.");
-        }
-    }
+		//        int topTier = (int)((double)sortedChromosomes.size() * topTierProportion);
+		//        while (survivors.size() < topTier) {
+		//            need a reverse iterator or something
+		//        }
 
-    protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<Text> scoredChromosomeStrings) {
-        TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
-            @Override
-            public int compare(ScoredChromosome c1, ScoredChromosome c2) {
-                return c1.score.compareTo(c2.score);
-            }
-        });
+		while (survivors.size() < survivorsWanted) {
+			survivors.add(selectSurvivor(sortedChromosomes));
+		}
 
-        sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
-        Iterator<Text> iter = scoredChromosomeStrings.iterator();
+		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
-        while (iter.hasNext()) {
-            Text chromosomeToParse = iter.next();
-            ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
-            if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
-            log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
-        }
+		int survivorsSize = survivors.size();
+		System.out.println("Survivors size is " + survivorsSize + " desired pop size is " + desiredPopulationSize);
+		while (survivorsSize < desiredPopulationSize) {
+			survivors.add(makeOffspring(parentPool));
+		}
 
-        return sortedChromosomes;
-    }
+		System.out.println("Finished the inner, about to iterate over outer");
+		Iterator<ScoredChromosome> iter = survivors.iterator();
+		while (iter.hasNext()) {
+			ScoredChromosome sc = iter.next();
+			outKey.set(sc.chromosome);
+			outValue.set(sc.score);
+			context.write(outKey, outValue);
+		}
+	}
 
-    protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
-        Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
-        double accumulatedScore = 0.0;
-        while (iter.hasNext()) {
-            ScoredChromosome sc = iter.next();
-            accumulatedScore += sc.score / sideEffectSum;
-            sc.accumulatedNormalizedScore = accumulatedScore;
-            log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore));
-        }
-    }
+	private List<ScoredChromosome> innerReduce(List<ScoredChromosome> currSubset) throws InterruptedException {
+		System.out.println("VALUES SIZE "+ currSubset.size());
+		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(currSubset);
+		System.out.println("GOT SORTED CHROM SET SIZE " + sortedChromosomes.size());
+		normalizeScores(sortedChromosomes);
 
-    protected ScoredChromosome selectSurvivor(Iterable<ScoredChromosome> scoredAndNormalizedChromosomes) {
-        double thresholdScore = random.nextDouble();
-        Iterator<ScoredChromosome> iter = scoredAndNormalizedChromosomes.iterator();
-        while (iter.hasNext()) {
-            ScoredChromosome sc = iter.next();
-            if (sc.accumulatedNormalizedScore > thresholdScore) {
-                log.debug(String.format("SELECTING: chromosome: %s, score: %g, accnormscore: %g, threshold: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, thresholdScore));
-                return sc;
-            }
-        }
+		System.out.println("SURVIVOR PROP " + survivorProportion);
+		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
+		System.out.println("SURVIVORS WANTED " + survivorsWanted);
+		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
-        return null; // LATER this is a horrible error condition, and I should do something about it
-    }
+		while (survivors.size() < survivorsWanted) {
+			survivors.add(selectSurvivor(sortedChromosomes));
+		}
 
-    protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException {
-        int parent1Index = random.nextInt(parentPool.size());
-        int parent2Index = parent1Index;
-        while (parent2Index == parent1Index) {
-            parent2Index = random.nextInt(parentPool.size());
-        }
+		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
-        try {
-            ScoredChromosome parent1 = parentPool.get(parent1Index);
-            ScoredChromosome parent2 = parentPool.get(parent2Index);
-            log.debug(String.format("PARENT 1: chromosome: %s, score: %g, accnormscore: %g", parent1.chromosome, parent1.score, parent1.accumulatedNormalizedScore));
-            log.debug(String.format("PARENT 2: chromosome: %s, score: %g, accnormscore: %g", parent2.chromosome, parent2.score, parent2.accumulatedNormalizedScore));
+		System.out.println("SURVIVORS SIZE " + survivors.size());
+		int survivorsSize = survivors.size();
+		while (survivorsSize < desiredPopulationSize) {
+			survivors.add(makeOffspring(parentPool));
+			survivorsSize++;
+		}
 
-            ScoredChromosome offspring = crossover(parent1, parent2);
-            if (random.nextDouble() < mutationChance) {
-                mutate(offspring);
-            }
+		List<ScoredChromosome> toReturn = new ArrayList<ScoredChromosome>();
+		Iterator<ScoredChromosome> iter = survivors.iterator();
+		while (iter.hasNext()) {
+			ScoredChromosome sc = iter.next();
+			toReturn.add(sc);
+		}
+		System.out.println("SIZE OF RETURN IS " + toReturn.size());
+		return toReturn;
+	}
 
-            offspring.score = scorer.score(offspring.chromosome);
+	@Override
+	protected void setup(Context context) throws IOException, InterruptedException {
+		super.setup(context);
+		Configuration config = context.getConfiguration();
+		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
+		topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
+		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
+		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
+		if (config.get("cities") == null) {
+			throw new InterruptedException("Failure! No city map.");
+		}
+		scorer = new ChromosomeScorer(config.get("cities"));
+		if (scorer.cities.size() < 3) {
+			throw new InterruptedException("Failure! Invalid city map.");
+		}
+	}
+	
+	  protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<?> scoredChromosomeStrings) {
+	        TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
+	            @Override
+	            public int compare(ScoredChromosome c1, ScoredChromosome c2) {
+	                return c1.score.compareTo(c2.score);
+	            }
+	        });
 
-            return offspring;
-        } catch (NullPointerException npe) {
-            log.error("*** NullPointerException in makeOffspring()");
-            log.error(String.format("parent 1 index: %d   parent 2 index: %d   pool size: %d", parent1Index, parent2Index, parentPool.size()));
-            if (parentPool.get(parent1Index) == null) log.error("parent 1 null!");
-            if (parentPool.get(parent2Index) == null) log.error("parent 2 null!");
-            throw new InterruptedException("null pointer exception in makeOffspring()");
-        }
-    }
+	        sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
+	        Iterator<?> iter = scoredChromosomeStrings.iterator();
 
-    protected ScoredChromosome crossover(ScoredChromosome parent1, ScoredChromosome parent2) {
-        int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
-        ScoredChromosome offspring = new ScoredChromosome();
+	        while (iter.hasNext()) {
+	        	Object nextItem = iter.next();
+	        	ScoredChromosome sc = null;
+	        	if (nextItem.getClass().equals(Text.class)) {
+	        		sc = new ScoredChromosome((Text) nextItem);
+	        	} else if (nextItem.getClass().equals(ScoredChromosome.class)) {
+	        		sc = (ScoredChromosome) nextItem;
+	        	}
+	            if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
+	            log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
+	        }
 
-        StringBuilder newChromosome = new StringBuilder();
-        for (int i = 0; i < crossoverPoint; ++i) {
-            newChromosome.append(parent1.getChromosomeArray()[i]);
-            newChromosome.append(" ");
-        }
-        for (int j = crossoverPoint; j < parent2.getChromosomeArray().length; ++j) {
-            newChromosome.append(parent2.getChromosomeArray()[j]);
-            newChromosome.append(" ");
-        }
-        offspring.chromosome = newChromosome.toString().trim();
+	        return sortedChromosomes;
+	    }
 
-        return offspring;
-    }
+	protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
+		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
+		double accumulatedScore = 0.0;
+		while (iter.hasNext()) {
+			ScoredChromosome sc = iter.next();
+			accumulatedScore += sc.score / sideEffectSum;
+			sc.accumulatedNormalizedScore = accumulatedScore;
+			log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore));
+		}
+	}
 
-    protected void mutate(ScoredChromosome offspring) {
-        int geneToMutate = random.nextInt(offspring.getChromosomeArray().length);
-        offspring.setGene(geneToMutate, random.nextInt(offspring.getChromosomeArray().length + 1 - geneToMutate));
-    }
+	protected ScoredChromosome selectSurvivor(Iterable<ScoredChromosome> scoredAndNormalizedChromosomes) {
+		double thresholdScore = random.nextDouble();
+		Iterator<ScoredChromosome> iter = scoredAndNormalizedChromosomes.iterator();
+		while (iter.hasNext()) {
+			ScoredChromosome sc = iter.next();
+			if (sc.accumulatedNormalizedScore > thresholdScore) {
+				log.debug(String.format("SELECTING: chromosome: %s, score: %g, accnormscore: %g, threshold: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, thresholdScore));
+				return sc;
+			}
+		}
+
+		return null; // LATER this is a horrible error condition, and I should do something about it
+	}
+
+	protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException {
+		int parent1Index = random.nextInt(parentPool.size());
+		int parent2Index = parent1Index;
+		while (parent2Index == parent1Index) {
+			parent2Index = random.nextInt(parentPool.size());
+		}
+
+		try {
+			ScoredChromosome parent1 = parentPool.get(parent1Index);
+			ScoredChromosome parent2 = parentPool.get(parent2Index);
+			log.debug(String.format("PARENT 1: chromosome: %s, score: %g, accnormscore: %g", parent1.chromosome, parent1.score, parent1.accumulatedNormalizedScore));
+			log.debug(String.format("PARENT 2: chromosome: %s, score: %g, accnormscore: %g", parent2.chromosome, parent2.score, parent2.accumulatedNormalizedScore));
+
+			ScoredChromosome offspring = crossover(parent1, parent2);
+			if (random.nextDouble() < mutationChance) {
+				mutate(offspring);
+			}
+
+			offspring.score = scorer.score(offspring.chromosome);
+
+			//System.out.println("OFFSPRING " + offspring.toString());
+			return offspring;
+		} catch (NullPointerException npe) {
+			log.error("*** NullPointerException in makeOffspring()");
+			log.error(String.format("parent 1 index: %d   parent 2 index: %d   pool size: %d", parent1Index, parent2Index, parentPool.size()));
+			if (parentPool.get(parent1Index) == null) log.error("parent 1 null!");
+			if (parentPool.get(parent2Index) == null) log.error("parent 2 null!");
+			throw new InterruptedException("null pointer exception in makeOffspring()");
+		}
+	}
+
+	protected ScoredChromosome crossover(ScoredChromosome parent1, ScoredChromosome parent2) {
+		int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
+		ScoredChromosome offspring = new ScoredChromosome();
+
+		StringBuilder newChromosome = new StringBuilder();
+		for (int i = 0; i < crossoverPoint; ++i) {
+			newChromosome.append(parent1.getChromosomeArray()[i]);
+			newChromosome.append(" ");
+		}
+		for (int j = crossoverPoint; j < parent2.getChromosomeArray().length; ++j) {
+			newChromosome.append(parent2.getChromosomeArray()[j]);
+			newChromosome.append(" ");
+		}
+		offspring.chromosome = newChromosome.toString().trim();
+
+		return offspring;
+	}
+
+	protected void mutate(ScoredChromosome offspring) {
+		int geneToMutate = random.nextInt(offspring.getChromosomeArray().length);
+		offspring.setGene(geneToMutate, random.nextInt(offspring.getChromosomeArray().length + 1 - geneToMutate));
+	}
 }

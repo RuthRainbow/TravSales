@@ -30,12 +30,15 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
 
     @Override
     protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-        // WHERE THE SELECTION TAKES PLACE
+        // WHERE THE SELECTION TAKES PLACE - no, actually this algo does selection in thre reducer. 
+    	// That is beacsue the guys aren't assigned to a reducer yet.
+    	// However i think they should be scored here, so the computation isn't needed in the reducer?
+    	// But there is nothing to compare them to yet...
     	// problem - how to pick best n when the pairs come in one by one :-/
     	// as suggested in the guy's blog, could use fitness proportion as it uses an equation and doesn't need all pairs
     	
     	// Use the inverse of the cost as the fitness
-    	System.out.println("text is " + value);
+    	//System.out.println("text is " + value);
     	// The value is the actual chromosome. The final value is the chromosome score / fitness?
     	double fitness = (key.get() == 0 ? 0 : 1/key.get());
     	double fitnessSelectionValue = fitness;
@@ -44,9 +47,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     		// somehow know the values of all the other guy's fitnesses? XD 
     	}
     	
-    	
-    	//outKey.set(random.nextInt(numBins));
-    	outKey.set((int) fitness);
+    	outKey.set(random.nextInt(numBins));
+    	//outKey.set((int) fitness);
         context.write(outKey, value); // shuffle
     }
 
