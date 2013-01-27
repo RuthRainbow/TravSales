@@ -8,6 +8,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -22,7 +24,6 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.commons.io.FileUtils;
 
 /**
  *
@@ -48,7 +49,7 @@ public class TravSalesJob extends Configured implements Tool {
     	FileUtils.deleteDirectory(new File(popPath));
         ToolRunner.run(new TravSalesJob(), args);
     }
-    
+
     @Override
     public int run(String[] args) throws Exception {
     	Configuration conf = new Configuration();
@@ -78,17 +79,19 @@ public class TravSalesJob extends Configured implements Tool {
             System.exit(1);
         }
 
-        //for (int generation = 0; generation < generations; ++generation) {
-        //    selectAndReproduce(generation, roadmap);
-        //}
-        selectAndReproduce(0, roadmap);
+        String[] innerArgs = new String[1];
+        innerArgs[0] = String.valueOf(0);
+        ToolRunner.run(new InnerJob(), innerArgs);
+
+        for (int generation = 0; generation < generations; ++generation) {
+            selectAndReproduce(generation, roadmap);
+        }
 		return 0;
-    	
+
     }
 
-
-    protected static void selectAndReproduce(int generation, String roadmap)
-    		throws Exception {
+    protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
+    	System.out.println("IN SELECT AND REPRODUCE");
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
@@ -105,7 +108,7 @@ public class TravSalesJob extends Configured implements Tool {
         job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(SelectionReproductionReducer.class);
 
-        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));
+        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d", generation)));
         FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d", generation + 1)));
 
         System.out.println(String.format("Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
@@ -113,8 +116,11 @@ public class TravSalesJob extends Configured implements Tool {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
             System.exit(1);
         }
-        
-        ToolRunner.run(new InnerJob(), null);
+
+        String[] args = new String[1];
+        args[0] = String.valueOf(generation);
+        ToolRunner.run(new InnerJob(), args);
+        System.out.println("RETURNED FROM INNER JOB");
     }
 
 
@@ -131,7 +137,7 @@ public class TravSalesJob extends Configured implements Tool {
         return roadmap;
     }
 
-    protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, 
+    protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
     		final int numCitiesIgnored) throws IOException {
         ArrayList<double[]> roadmap = new ArrayList<double[]>(20);
         for (int i = 0; i < 5; ++i) {
@@ -158,7 +164,7 @@ public class TravSalesJob extends Configured implements Tool {
         return configStringBuilder.toString();
     }
 
-    protected static String createRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, 
+    protected static String createRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
     		final int numCities) throws IOException {
         ArrayList<double[]> roadmap = createMap(numCities);
         StringBuilder configStringBuilder = new StringBuilder("");
@@ -177,7 +183,7 @@ public class TravSalesJob extends Configured implements Tool {
         return configStringBuilder.toString();
     }
 
-    protected static void createInitialPopulation(FSDataOutputStream populationOutfile, 
+    protected static void createInitialPopulation(FSDataOutputStream populationOutfile,
     		final int populationSize, final int numCities) throws IOException {
         // Could create good initial solution using what the paper was chatting about graphs least tree or something
     	for (int i = 0; i < populationSize; ++i) {

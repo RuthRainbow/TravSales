@@ -27,11 +27,11 @@ public class InnerJob extends Configured implements Tool {
     private static String inputPath = "travsales_populations_outer";
     private static String outputPath = "travsales_populations";
     private static int numCities = 20;
-    private static int populationSize = 10000;
     private static int selectionBinSize = 10000;
     private static float topTierToSave = 0.1f; // TODO
     private static float survivorProportion = 0.3f;
     private static float mutationChance = 0.01f;
+    private static int generation;
     
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(outputPath));
@@ -58,20 +58,18 @@ public class InnerJob extends Configured implements Tool {
 
         job.setJarByClass(InnerJob.class);
         job.setMapperClass(InnerMapper.class);
-
-        //ASSUMING POP NUMBER WILL COME IN AT ARGS[0];
-        //FileInputFormat.setInputPaths(job, new Path(inputPath + "/population_" + args[0]));
-        //FileOutputFormat.setOutputPath(job, new Path(outputPath + "/population_" + args[0] + "_scored"));
         
-        FileInputFormat.setInputPaths(job, new Path(inputPath + "/tmp_" + 0));
-        FileOutputFormat.setOutputPath(job, new Path(outputPath + "/population_" + 0 + "_scored"));
+        generation = Integer.valueOf(args[0]);
+
+        FileInputFormat.setInputPaths(job, new Path(inputPath + "/population_" + generation));
+        FileOutputFormat.setOutputPath(job, new Path(outputPath + "/population_" + generation + "_scored"));
 
         if (!job.waitForCompletion(true)) {
             System.out.println("Failure scoring first generation");
             System.exit(1);
         }
 
-        selectAndReproduce(0, roadmap);
+        selectAndReproduce(generation, roadmap);
 		return 0;
 	}
 	

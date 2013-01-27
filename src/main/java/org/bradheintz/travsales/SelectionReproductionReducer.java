@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -57,75 +56,24 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	private DoubleWritable outValue = new DoubleWritable();
 
 	@Override
-	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-		//Want to embed this to split again then reduce again
-		//System.out.println("IN THE REDUCE");
-		generateSurvivors(values, context);
-	}
-
-	private void generateSurvivors(Iterable<Text> values, Context context) throws InterruptedException, IOException {
-		// Want to do inner reduce before the values are sorted. Need to split iterable into parts
-		//- have to iterate over. Don't know the number of values :(
-		List<ScoredChromosome> reducedVals = new ArrayList<ScoredChromosome>();
-		List<ScoredChromosome> cache = new ArrayList<ScoredChromosome>();
-		
-		int numValues = 0;
-		for (Text text : values) {
-			numValues++;
-			ScoredChromosome sc = new ScoredChromosome(text);
-			cache.add(sc);
-		}
-
-		int valuesPerSubset = (int) Math.floor(numValues/numSubsets);
-		int nextSubset = valuesPerSubset;
-		List<ScoredChromosome> currSubset = new ArrayList<ScoredChromosome>();
-		//System.out.println(valuesPerSubset + " per subset");
-
-		for (ScoredChromosome sc : cache) {
-			currSubset.add(sc);
-			if (currSubset.size() > nextSubset) {
-				//System.out.println(currSubset.size() + " > " + nextSubset);
-				int tmp = nextSubset + valuesPerSubset;
-				if (numValues - tmp >= valuesPerSubset) {
-					//System.out.println("size of reduced vals was " + reducedVals.size());
-					//reducedVals.addAll(innerReduce(currSubset));
-					//System.out.println("size of reduced vals is now " + reducedVals.size());
-					currSubset.clear();
-					nextSubset += valuesPerSubset;
-				} else {
-					nextSubset += numValues % numSubsets;
-				}
-			}
-		}
-		
-		//System.out.println("REDUCED VALS SIZE IS " + reducedVals.size());
-
-		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(reducedVals);
+	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
+		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
 		normalizeScores(sortedChromosomes);
 
-		//System.out.println("sorted chroms size is " + sortedChromosomes.size() + " suvivor prop is " + survivorProportion);
 		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
-		//        int topTier = (int)((double)sortedChromosomes.size() * topTierProportion);
-		//        while (survivors.size() < topTier) {
-		//            need a reverse iterator or something
-		//        }
-
-		//System.out.println(survivorsWanted + " SURVIVORS WANTED");
 		while (survivors.size() < survivorsWanted) {
 			survivors.add(selectSurvivor(sortedChromosomes));
 		}
 
+		// TODO just use survivors for newPopulation - why not? avoid dupes, save making another collection
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
-		int survivorsSize = survivors.size();
-		//System.out.println("Survivors size is " + survivorsSize + " desired pop size is " + desiredPopulationSize);
-		while (survivorsSize < desiredPopulationSize) {
-			survivors.add(makeOffspring(parentPool)); // OUT OF MEM ERROR HERE ON SOME POPS! :(
+		while (survivors.size() < desiredPopulationSize) {
+			survivors.add(makeOffspring(parentPool));
 		}
 
-		//System.out.println("Finished the inner, about to iterate over outer");
 		Iterator<ScoredChromosome> iter = survivors.iterator();
 		while (iter.hasNext()) {
 			ScoredChromosome sc = iter.next();
@@ -133,43 +81,6 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			outValue.set(sc.score);
 			context.write(outKey, outValue);
 		}
-	}
-
-	private List<ScoredChromosome> innerReduce(List<ScoredChromosome> currSubset) throws InterruptedException {
-		//System.out.println("VALUES SIZE "+ currSubset.size());
-		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(currSubset);
-		//System.out.println("GOT SORTED CHROM SET SIZE " + sortedChromosomes.size());
-		normalizeScores(sortedChromosomes);
-
-		//System.out.println("SURVIVOR PROP " + survivorProportion);
-		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
-		//System.out.println("SURVIVORS WANTED " + survivorsWanted);
-		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
-
-		//System.out.println(survivors.size() + " SURVIVORS AND " + survivorsWanted + " WANTED");
-		while (survivors.size() < survivorsWanted) {
-			survivors.add(selectSurvivor(sortedChromosomes));
-		}
-
-		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
-
-		//System.out.println("SURVIVORS SIZE " + survivors.size() + " DESIREC SIZE " + desiredPopulationSize);
-		int survivorsSize = survivors.size();
-		while (survivorsSize < desiredPopulationSize*2) {
-			survivors.add(makeOffspring(parentPool));
-			survivorsSize++;
-		}
-		
-		//System.out.println("IN THE INNER REDUCE> SURVIVORS + " + survivors.size());
-
-		List<ScoredChromosome> toReturn = new ArrayList<ScoredChromosome>();
-		Iterator<ScoredChromosome> iter = survivors.iterator();
-		while (iter.hasNext()) {
-			ScoredChromosome sc = iter.next();
-			toReturn.add(sc);
-		}
-		//System.out.println("SIZE OF RETURN IS " + toReturn.size());
-		return toReturn;
 	}
 
 	@Override
