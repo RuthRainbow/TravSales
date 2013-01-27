@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.TreeSet;
 import org.apache.hadoop.io.Text;
-import org.bradheintz.travsales.SelectionReproductionReducer.ScoredChromosome;
+import org.bradheintz.travsales.ScoredChromosome;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -50,7 +50,9 @@ public class SelectionReproductionReducerTest {
         unsortedChromosomes.add(new Text("b\t 3.0"));
         unsortedChromosomes.add(new Text("q\t 1.0"));
 
-        TreeSet<ScoredChromosome> sortedChromosomes = reducer.getSortedChromosomeSet(unsortedChromosomes); // a little integration-y, since we have to unpack the chromosomes
+        TreeSet<ScoredChromosome> sortedChromosomes = 
+        		reducer.getSortedChromosomeSet(unsortedChromosomes); 
+        // a little integration-y, since we have to unpack the chromosomes
 
         Iterator<ScoredChromosome> iter = sortedChromosomes.iterator();
         Assert.assertTrue(iter.hasNext());

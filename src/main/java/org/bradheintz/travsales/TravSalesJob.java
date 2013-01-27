@@ -4,6 +4,7 @@
  */
 package org.bradheintz.travsales;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
@@ -19,32 +20,40 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+import org.apache.commons.io.FileUtils;
 
 /**
  *
  * @author bradheintz
  */
-public class TravSalesJob extends Configured {
+public class TravSalesJob extends Configured implements Tool {
 
     private static Random random = new Random();
 
     // LATER these should all be configurable
-    private static String popPath = "travsales_populations";
+    private static String popPath = "travsales_populations_outer";
     private static int numCities = 20;
-    private static int populationSize = 100000;
+    private static int populationSize = 10000;
     private static int selectionBinSize = 10000;
     private static float topTierToSave = 0.1f; // TODO
     private static float survivorProportion = 0.3f;
     private static float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static int generations = 1;
+    private static int generations = 500;
 
 
     public static void main(String[] args) throws Exception {
-        Configuration conf = new Configuration();
+    	FileUtils.deleteDirectory(new File(popPath));
+        ToolRunner.run(new TravSalesJob(), args);
+    }
+    
+    @Override
+    public int run(String[] args) throws Exception {
+    	Configuration conf = new Configuration();
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 
-        // TODO make it so the folder is new each time
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
         conf.set("cities", roadmap);
@@ -62,21 +71,24 @@ public class TravSalesJob extends Configured {
         job.setMapperClass(ScoringMapper.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + "/population_0"));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + "/population_0_scored"));
+        FileOutputFormat.setOutputPath(job, new Path(popPath + "/tmp_0"));
 
         if (!job.waitForCompletion(true)) {
             System.out.println("Failure scoring first generation");
             System.exit(1);
         }
 
-        for (int generation = 0; generation < generations; ++generation) {
-            selectAndReproduce(generation, roadmap);
-        }
+        //for (int generation = 0; generation < generations; ++generation) {
+        //    selectAndReproduce(generation, roadmap);
+        //}
+        selectAndReproduce(0, roadmap);
+		return 0;
+    	
     }
 
 
     protected static void selectAndReproduce(int generation, String roadmap)
-    		throws IOException, InterruptedException, ClassNotFoundException {
+    		throws Exception {
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
@@ -93,14 +105,16 @@ public class TravSalesJob extends Configured {
         job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(SelectionReproductionReducer.class);
 
-        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/population_%d_scored", generation + 1)));
+        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));
+        FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d", generation + 1)));
 
         System.out.println(String.format("Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
         if (!job.waitForCompletion(true)) {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
             System.exit(1);
         }
+        
+        ToolRunner.run(new InnerJob(), null);
     }
 
 

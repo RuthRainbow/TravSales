@@ -1,5 +1,22 @@
 /*
- * To change this template, choose Tools | Templates
+  CURRENT ERROR : 
+java.lang.OutOfMemoryError: GC overhead limit exceeded
+	at java.util.Formatter$FormatSpecifier.mantissa(Formatter.java:3360)
+	at java.util.Formatter$FormatSpecifier.print(Formatter.java:3295)
+	at java.util.Formatter$FormatSpecifier.print(Formatter.java:3190)
+	at java.util.Formatter$FormatSpecifier.printFloat(Formatter.java:2757)
+	at java.util.Formatter$FormatSpecifier.print(Formatter.java:2708)
+	at java.util.Formatter.format(Formatter.java:2488)
+	at java.util.Formatter.format(Formatter.java:2423)
+	at java.lang.String.format(String.java:2797)
+	at org.bradheintz.travsales.SelectionReproductionReducer.makeOffspring(SelectionReproductionReducer.java:265)
+	at org.bradheintz.travsales.SelectionReproductionReducer.generateSurvivors(SelectionReproductionReducer.java:140)
+	at org.bradheintz.travsales.SelectionReproductionReducer.reduce(SelectionReproductionReducer.java:82)
+	at org.bradheintz.travsales.SelectionReproductionReducer.reduce(SelectionReproductionReducer.java:28)
+
+* 
+* 
+* To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
 package org.bradheintz.travsales;
@@ -30,6 +47,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
 	private double survivorProportion;
 	private double topTierProportion;
+	private int numSubsets = 5;
 	private int desiredPopulationSize;
 	protected double sideEffectSum = 0.0;
 	protected double mutationChance = 0.01;
@@ -38,47 +56,10 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	private Text outKey = new Text();
 	private DoubleWritable outValue = new DoubleWritable();
 
-	static class ScoredChromosome {
-
-		String chromosome;
-		String[] chromosomeArray = null;
-		Double score;
-		double accumulatedNormalizedScore = -1.0;
-
-		ScoredChromosome() {
-			chromosome = "";
-			score = -1.0;
-		}
-
-		ScoredChromosome(Text testText) {
-			String[] fields = testText.toString().split("\t");
-			chromosome = fields[0];
-			score = Double.parseDouble(fields[1]);
-		}
-
-		String[] getChromosomeArray() {
-			if (chromosomeArray == null) {
-				chromosomeArray = chromosome.split(" ");
-			}
-			return chromosomeArray;
-		}
-
-		void setGene(int geneToSet, int newValue) {
-			// TODO boundary checks
-			getChromosomeArray()[geneToSet] = Integer.toString(newValue);
-			StringBuilder newChromosome = new StringBuilder();
-			for (int j = 0; j < getChromosomeArray().length; ++j) {
-				newChromosome.append(getChromosomeArray()[j]);
-				newChromosome.append(" ");
-			}
-			chromosome = newChromosome.toString().trim();
-		}
-	}
-
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
 		//Want to embed this to split again then reduce again
-		System.out.println("IN THE REDUCE");
+		//System.out.println("IN THE REDUCE");
 		generateSurvivors(values, context);
 	}
 
@@ -86,27 +67,29 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		// Want to do inner reduce before the values are sorted. Need to split iterable into parts
 		//- have to iterate over. Don't know the number of values :(
 		List<ScoredChromosome> reducedVals = new ArrayList<ScoredChromosome>();
-
-		int numValues = 9995;
-		/*for (Text text : values) {
+		List<ScoredChromosome> cache = new ArrayList<ScoredChromosome>();
+		
+		int numValues = 0;
+		for (Text text : values) {
 			numValues++;
-		}*/
-		System.out.println("NUM VALUES IS " + numValues);
+			ScoredChromosome sc = new ScoredChromosome(text);
+			cache.add(sc);
+		}
 
-		int numSubsets = 5;
 		int valuesPerSubset = (int) Math.floor(numValues/numSubsets);
 		int nextSubset = valuesPerSubset;
 		List<ScoredChromosome> currSubset = new ArrayList<ScoredChromosome>();
-		System.out.println(valuesPerSubset + " per subset");
+		//System.out.println(valuesPerSubset + " per subset");
 
-		for (Text value : values) {
-			ScoredChromosome sc = new ScoredChromosome(value);
+		for (ScoredChromosome sc : cache) {
 			currSubset.add(sc);
 			if (currSubset.size() > nextSubset) {
-				System.out.println(currSubset.size() + " > " + nextSubset);
+				//System.out.println(currSubset.size() + " > " + nextSubset);
 				int tmp = nextSubset + valuesPerSubset;
 				if (numValues - tmp >= valuesPerSubset) {
-					reducedVals.addAll(innerReduce(currSubset));
+					//System.out.println("size of reduced vals was " + reducedVals.size());
+					//reducedVals.addAll(innerReduce(currSubset));
+					//System.out.println("size of reduced vals is now " + reducedVals.size());
 					currSubset.clear();
 					nextSubset += valuesPerSubset;
 				} else {
@@ -115,11 +98,12 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			}
 		}
 		
-		System.out.println("REDUCED VALS SIZE IS " + reducedVals.size());
+		//System.out.println("REDUCED VALS SIZE IS " + reducedVals.size());
 
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(reducedVals);
 		normalizeScores(sortedChromosomes);
 
+		//System.out.println("sorted chroms size is " + sortedChromosomes.size() + " suvivor prop is " + survivorProportion);
 		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
@@ -128,6 +112,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		//            need a reverse iterator or something
 		//        }
 
+		//System.out.println(survivorsWanted + " SURVIVORS WANTED");
 		while (survivors.size() < survivorsWanted) {
 			survivors.add(selectSurvivor(sortedChromosomes));
 		}
@@ -135,12 +120,12 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
 		int survivorsSize = survivors.size();
-		System.out.println("Survivors size is " + survivorsSize + " desired pop size is " + desiredPopulationSize);
+		//System.out.println("Survivors size is " + survivorsSize + " desired pop size is " + desiredPopulationSize);
 		while (survivorsSize < desiredPopulationSize) {
-			survivors.add(makeOffspring(parentPool));
+			survivors.add(makeOffspring(parentPool)); // OUT OF MEM ERROR HERE ON SOME POPS! :(
 		}
 
-		System.out.println("Finished the inner, about to iterate over outer");
+		//System.out.println("Finished the inner, about to iterate over outer");
 		Iterator<ScoredChromosome> iter = survivors.iterator();
 		while (iter.hasNext()) {
 			ScoredChromosome sc = iter.next();
@@ -151,28 +136,31 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	}
 
 	private List<ScoredChromosome> innerReduce(List<ScoredChromosome> currSubset) throws InterruptedException {
-		System.out.println("VALUES SIZE "+ currSubset.size());
+		//System.out.println("VALUES SIZE "+ currSubset.size());
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(currSubset);
-		System.out.println("GOT SORTED CHROM SET SIZE " + sortedChromosomes.size());
+		//System.out.println("GOT SORTED CHROM SET SIZE " + sortedChromosomes.size());
 		normalizeScores(sortedChromosomes);
 
-		System.out.println("SURVIVOR PROP " + survivorProportion);
+		//System.out.println("SURVIVOR PROP " + survivorProportion);
 		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
-		System.out.println("SURVIVORS WANTED " + survivorsWanted);
+		//System.out.println("SURVIVORS WANTED " + survivorsWanted);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
+		//System.out.println(survivors.size() + " SURVIVORS AND " + survivorsWanted + " WANTED");
 		while (survivors.size() < survivorsWanted) {
 			survivors.add(selectSurvivor(sortedChromosomes));
 		}
 
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
-		System.out.println("SURVIVORS SIZE " + survivors.size());
+		//System.out.println("SURVIVORS SIZE " + survivors.size() + " DESIREC SIZE " + desiredPopulationSize);
 		int survivorsSize = survivors.size();
-		while (survivorsSize < desiredPopulationSize) {
+		while (survivorsSize < desiredPopulationSize*2) {
 			survivors.add(makeOffspring(parentPool));
 			survivorsSize++;
 		}
+		
+		//System.out.println("IN THE INNER REDUCE> SURVIVORS + " + survivors.size());
 
 		List<ScoredChromosome> toReturn = new ArrayList<ScoredChromosome>();
 		Iterator<ScoredChromosome> iter = survivors.iterator();
@@ -180,7 +168,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			ScoredChromosome sc = iter.next();
 			toReturn.add(sc);
 		}
-		System.out.println("SIZE OF RETURN IS " + toReturn.size());
+		//System.out.println("SIZE OF RETURN IS " + toReturn.size());
 		return toReturn;
 	}
 
@@ -190,7 +178,8 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		Configuration config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
 		topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
-		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
+		//desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
+		desiredPopulationSize = 1000;
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
@@ -210,22 +199,26 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	        });
 
 	        sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
-	        Iterator<?> iter = scoredChromosomeStrings.iterator();
 
-	        while (iter.hasNext()) {
-	        	Object nextItem = iter.next();
-	        	ScoredChromosome sc = null;
-	        	if (nextItem.getClass().equals(Text.class)) {
-	        		sc = new ScoredChromosome((Text) nextItem);
-	        	} else if (nextItem.getClass().equals(ScoredChromosome.class)) {
-	        		sc = (ScoredChromosome) nextItem;
+	        ScoredChromosome sc = null;;
+	        for (Object currString : scoredChromosomeStrings) {
+	        	if (currString.getClass().equals(Text.class)) {
+	        		sc = new ScoredChromosome((Text) currString);
+	        	} else if (currString.getClass().equals(ScoredChromosome.class)) {
+	        		sc = (ScoredChromosome) currString;
 	        	}
-	            if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
+	        	
+	            if (sortedChromosomes.add(sc)) {
+	            	sideEffectSum += sc.score;
+	            } else {
+	            	//System.out.println("ERRORRRRRRRRRRRRRR");
+	            }
 	            log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
 	        }
 
 	        return sortedChromosomes;
 	    }
+	  
 
 	protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
 		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
@@ -271,8 +264,6 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			}
 
 			offspring.score = scorer.score(offspring.chromosome);
-
-			//System.out.println("OFFSPRING " + offspring.toString());
 			return offspring;
 		} catch (NullPointerException npe) {
 			log.error("*** NullPointerException in makeOffspring()");
