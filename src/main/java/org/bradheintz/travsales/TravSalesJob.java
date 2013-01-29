@@ -90,7 +90,6 @@ public class TravSalesJob extends Configured implements Tool {
     }
 
     protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
-    	System.out.println("IN SELECT AND REPRODUCE");
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
@@ -104,6 +103,7 @@ public class TravSalesJob extends Configured implements Tool {
         job.setOutputValueClass(Text.class);
 
         job.setJarByClass(TravSalesJob.class);
+        job.setPartitionerClass(RandomPartitioner.class);
         job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(SelectionReproductionReducer.class);
 
@@ -119,10 +119,8 @@ public class TravSalesJob extends Configured implements Tool {
         String[] args = new String[1];
         args[0] = String.valueOf(generation);
         ToolRunner.run(new InnerJob(), args);
-        System.out.println("RETURNED FROM INNER JOB");
         FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d", generation)));
     }
-
 
     private static int numSelectionBins() {
         return populationSize / selectionBinSize;

@@ -2,7 +2,6 @@ package org.bradheintz.travsales;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -34,8 +33,6 @@ public class InnerJob extends Configured implements Tool {
 
 	@Override
 	public int run(String[] args) throws Exception {
-		System.out.println("RUNNING THE INNER JOB ARGS ARE " + Arrays.toString(args));
-
 		Configuration conf = new Configuration();
 
         FileSystem fs = FileSystem.get(conf);
@@ -61,7 +58,8 @@ public class InnerJob extends Configured implements Tool {
         job.setOutputValueClass(Text.class);
 
         job.setJarByClass(InnerJob.class);
-        job.setMapperClass(InnerMapper.class);
+        job.setPartitionerClass(RandomPartitioner.class);
+        job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(InnerReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));
