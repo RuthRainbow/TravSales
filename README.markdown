@@ -1,3 +1,6 @@
+Project forked from: 
+
+***
 TravSales
 =========
 
@@ -12,3 +15,6 @@ Notes
 -----
 
 See the TODO file in this directory for a sort of sketchy roadmap of intended improvements.
+***
+
+My plan is to convert this into a hierarchical genetic algorithm. At the moment the implementation involves two jobs chained together.

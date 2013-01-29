@@ -1,80 +1,53 @@
 package org.bradheintz.travsales;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 public class InnerJob extends Configured implements Tool {
-	
+
 	// LATER these should all be configurable
-    private static String inputPath = "travsales_populations_outer";
-    private static String outputPath = "travsales_populations";
+    private static String popPath = "travsales_populations";
     private static int numCities = 20;
     private static int selectionBinSize = 10000;
     private static float topTierToSave = 0.1f; // TODO
     private static float survivorProportion = 0.3f;
     private static float mutationChance = 0.01f;
     private static int generation;
-    
+
     public static void main(String[] args) throws Exception {
-    	FileUtils.deleteDirectory(new File(outputPath));
         ToolRunner.run(new InnerJob(), args);
     }
-    
+
 	@Override
 	public int run(String[] args) throws Exception {
 		System.out.println("RUNNING THE INNER JOB ARGS ARE " + Arrays.toString(args));
-		
-		FileUtils.deleteDirectory(new File(outputPath));
-		
+
 		Configuration conf = new Configuration();
-        String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
-        
+
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
-        conf.set("cities", roadmap);
 
-        Job job = new Job(conf, "innerJob");
-
-        job.setOutputKeyClass(VIntWritable.class);
-        job.setOutputValueClass(Text.class);
-
-        job.setJarByClass(InnerJob.class);
-        job.setMapperClass(InnerMapper.class);
-        
         generation = Integer.valueOf(args[0]);
-
-        FileInputFormat.setInputPaths(job, new Path(inputPath + "/population_" + generation));
-        FileOutputFormat.setOutputPath(job, new Path(outputPath + "/population_" + generation + "_scored"));
-
-        if (!job.waitForCompletion(true)) {
-            System.out.println("Failure scoring first generation");
-            System.exit(1);
-        }
 
         selectAndReproduce(generation, roadmap);
 		return 0;
 	}
-	
-	protected static void selectAndReproduce(int generation, String roadmap)
-    		throws Exception {
+
+	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
@@ -82,7 +55,7 @@ public class InnerJob extends Configured implements Tool {
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
 
-        Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
+        Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d", generation));
 
         job.setOutputKeyClass(VIntWritable.class);
         job.setOutputValueClass(Text.class);
@@ -91,19 +64,17 @@ public class InnerJob extends Configured implements Tool {
         job.setMapperClass(InnerMapper.class);
         job.setReducerClass(InnerReducer.class);
 
-        FileInputFormat.setInputPaths(job, new Path(inputPath + String.format("/tmp_%d", generation)));
-        FileOutputFormat.setOutputPath(job, new Path(outputPath + String.format("/population_%d_scored", generation + 1)));
+        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));
+        FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/population_%d_scored", generation + 1)));
 
-        System.out.println(String.format("Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
+        System.out.println(String.format("INNER Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
         if (!job.waitForCompletion(true)) {
-            System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
+            System.out.println(String.format("FAILURE selecting & reproducing generation %d INNER", generation));
             System.exit(1);
         }
-        
-        ToolRunner.run(new InnerJob(), null);
     }
-	
-	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig, 
+
+	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
     		final int numCitiesIgnored) throws IOException {
         ArrayList<double[]> roadmap = new ArrayList<double[]>(20);
         for (int i = 0; i < 5; ++i) {

@@ -34,7 +34,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static Random random = new Random();
 
     // LATER these should all be configurable
-    private static String popPath = "travsales_populations_outer";
+    private static String popPath = "travsales_populations";
     private static int numCities = 20;
     private static int populationSize = 10000;
     private static int selectionBinSize = 10000;
@@ -42,12 +42,13 @@ public class TravSalesJob extends Configured implements Tool {
     private static float survivorProportion = 0.3f;
     private static float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static int generations = 500;
+    private static int generations = 5;
 
 
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
         ToolRunner.run(new TravSalesJob(), args);
+        FileUtils.deleteDirectory(new File(popPath + "/tmp_" + generations));
     }
 
     @Override
@@ -79,9 +80,7 @@ public class TravSalesJob extends Configured implements Tool {
             System.exit(1);
         }
 
-        String[] innerArgs = new String[1];
-        innerArgs[0] = String.valueOf(0);
-        ToolRunner.run(new InnerJob(), innerArgs);
+        FileUtils.copyDirectory(new File(popPath + "/tmp_0"), new File(popPath + "/population_0_scored"));
 
         for (int generation = 0; generation < generations; ++generation) {
             selectAndReproduce(generation, roadmap);
@@ -108,7 +107,7 @@ public class TravSalesJob extends Configured implements Tool {
         job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(SelectionReproductionReducer.class);
 
-        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d", generation)));
+        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
         FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d", generation + 1)));
 
         System.out.println(String.format("Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
@@ -121,6 +120,7 @@ public class TravSalesJob extends Configured implements Tool {
         args[0] = String.valueOf(generation);
         ToolRunner.run(new InnerJob(), args);
         System.out.println("RETURNED FROM INNER JOB");
+        FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d", generation)));
     }
 
 

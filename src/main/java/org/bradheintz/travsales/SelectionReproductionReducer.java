@@ -1,5 +1,5 @@
 /*
-  CURRENT ERROR : 
+  CURRENT ERROR :
 java.lang.OutOfMemoryError: GC overhead limit exceeded
 	at java.util.Formatter$FormatSpecifier.mantissa(Formatter.java:3360)
 	at java.util.Formatter$FormatSpecifier.print(Formatter.java:3295)
@@ -14,8 +14,8 @@ java.lang.OutOfMemoryError: GC overhead limit exceeded
 	at org.bradheintz.travsales.SelectionReproductionReducer.reduce(SelectionReproductionReducer.java:82)
 	at org.bradheintz.travsales.SelectionReproductionReducer.reduce(SelectionReproductionReducer.java:28)
 
-* 
-* 
+*
+*
 * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
@@ -100,36 +100,28 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			throw new InterruptedException("Failure! Invalid city map.");
 		}
 	}
-	
-	  protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<?> scoredChromosomeStrings) {
-	        TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
-	            @Override
-	            public int compare(ScoredChromosome c1, ScoredChromosome c2) {
-	                return c1.score.compareTo(c2.score);
-	            }
-	        });
 
-	        sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
+	protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<Text> scoredChromosomeStrings) {
+        TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
+            @Override
+            public int compare(ScoredChromosome c1, ScoredChromosome c2) {
+                return c1.score.compareTo(c2.score);
+            }
+        });
 
-	        ScoredChromosome sc = null;;
-	        for (Object currString : scoredChromosomeStrings) {
-	        	if (currString.getClass().equals(Text.class)) {
-	        		sc = new ScoredChromosome((Text) currString);
-	        	} else if (currString.getClass().equals(ScoredChromosome.class)) {
-	        		sc = (ScoredChromosome) currString;
-	        	}
-	        	
-	            if (sortedChromosomes.add(sc)) {
-	            	sideEffectSum += sc.score;
-	            } else {
-	            	//System.out.println("ERRORRRRRRRRRRRRRR");
-	            }
-	            log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
-	        }
+        sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
 
-	        return sortedChromosomes;
-	    }
-	  
+        for (Text chromosomeToParse : scoredChromosomeStrings) {
+            ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
+            if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
+            log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
+        }
+
+        return sortedChromosomes;
+    }
+
+
+
 
 	protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
 		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();

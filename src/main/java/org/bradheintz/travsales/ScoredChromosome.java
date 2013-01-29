@@ -1,5 +1,7 @@
 package org.bradheintz.travsales;
 
+import java.util.Arrays;
+
 import org.apache.hadoop.io.Text;
 
 public class ScoredChromosome {
@@ -16,7 +18,14 @@ public class ScoredChromosome {
 	ScoredChromosome(Text testText) {
 		String[] fields = testText.toString().split("\t");
 		chromosome = fields[0];
-		score = Double.parseDouble(fields[1]);
+		try {
+			score = Double.parseDouble(fields[1]);
+		} catch (ArrayIndexOutOfBoundsException e) {
+			System.out.println("text given : " + testText);
+			System.out.println("fields became " + Arrays.toString(fields));
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 
 	String[] getChromosomeArray() {

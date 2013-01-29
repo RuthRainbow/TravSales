@@ -48,9 +48,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 			survivors.add(makeOffspring(parentPool));
 		}
 
-		Iterator<ScoredChromosome> iter = survivors.iterator();
-		while (iter.hasNext()) {
-			ScoredChromosome sc = iter.next();
+		for (ScoredChromosome sc : survivors) {
 			outKey.set(sc.chromosome);
 			outValue.set(sc.score);
 			context.write(outKey, outValue);
@@ -72,7 +70,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 			throw new InterruptedException("Failure! Invalid city map.");
 		}
 	}
-	
+
 	protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<Text> scoredChromosomeStrings) {
 		TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
             @Override
@@ -93,7 +91,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 
         return sortedChromosomes;
     }
-	
+
 	protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
 		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
 		double accumulatedScore = 0.0;
@@ -104,7 +102,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 			log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore));
 		}
 	}
-	
+
 	protected ScoredChromosome selectSurvivor(Iterable<ScoredChromosome> scoredAndNormalizedChromosomes) {
         double thresholdScore = random.nextDouble();
         Iterator<ScoredChromosome> iter = scoredAndNormalizedChromosomes.iterator();
@@ -118,7 +116,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 
         return null; // LATER this is a horrible error condition, and I should do something about it
     }
-	
+
 	protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException {
         int parent1Index = random.nextInt(parentPool.size());
         int parent2Index = parent1Index;
@@ -148,7 +146,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
             throw new InterruptedException("null pointer exception in makeOffspring()");
         }
     }
-	
+
 	protected ScoredChromosome crossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
 		ScoredChromosome offspring = new ScoredChromosome();
@@ -166,7 +164,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 
 		return offspring;
 	}
-	
+
 	protected void mutate(ScoredChromosome offspring) {
 		int geneToMutate = random.nextInt(offspring.getChromosomeArray().length);
 		offspring.setGene(geneToMutate, random.nextInt(offspring.getChromosomeArray().length + 1 - geneToMutate));
