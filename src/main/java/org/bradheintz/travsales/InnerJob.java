@@ -58,8 +58,7 @@ public class InnerJob extends Configured implements Tool {
         job.setOutputValueClass(Text.class);
 
         job.setJarByClass(InnerJob.class);
-        job.setPartitionerClass(RandomPartitioner.class);
-        job.setMapperClass(SelectionBinMapper.class);
+        job.setMapperClass(InnerMapper.class);
         job.setReducerClass(InnerReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));

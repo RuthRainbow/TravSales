@@ -1,24 +1,3 @@
-/*
-  CURRENT ERROR :
-java.lang.OutOfMemoryError: GC overhead limit exceeded
-	at java.util.Formatter$FormatSpecifier.mantissa(Formatter.java:3360)
-	at java.util.Formatter$FormatSpecifier.print(Formatter.java:3295)
-	at java.util.Formatter$FormatSpecifier.print(Formatter.java:3190)
-	at java.util.Formatter$FormatSpecifier.printFloat(Formatter.java:2757)
-	at java.util.Formatter$FormatSpecifier.print(Formatter.java:2708)
-	at java.util.Formatter.format(Formatter.java:2488)
-	at java.util.Formatter.format(Formatter.java:2423)
-	at java.lang.String.format(String.java:2797)
-	at org.bradheintz.travsales.SelectionReproductionReducer.makeOffspring(SelectionReproductionReducer.java:265)
-	at org.bradheintz.travsales.SelectionReproductionReducer.generateSurvivors(SelectionReproductionReducer.java:140)
-	at org.bradheintz.travsales.SelectionReproductionReducer.reduce(SelectionReproductionReducer.java:82)
-	at org.bradheintz.travsales.SelectionReproductionReducer.reduce(SelectionReproductionReducer.java:28)
-
-*
-*
-* To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package org.bradheintz.travsales;
 
 import java.io.IOException;
@@ -46,21 +25,24 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
 	private double survivorProportion;
 	private double topTierProportion;
-	private int numSubsets = 5;
-	private int desiredPopulationSize;
+	private double desiredPopulationSize;
 	protected double sideEffectSum = 0.0;
 	protected double mutationChance = 0.01;
 	protected Random random = new Random();
-	protected ChromosomeScorer scorer;
 	private Text outKey = new Text();
 	private DoubleWritable outValue = new DoubleWritable();
 
+	// Key - chromsome, Value - fitness value.
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
+		//System.out.println("in a reduce, the key is " + key);
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
 		normalizeScores(sortedChromosomes);
 
-		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
+		//System.out.println("sorted chrom size is " + sortedChromosomes.size());
+		int survivorsWanted = 1;
+		survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
+		//System.out.println("survivors wanted is " + survivorsWanted);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
 		while (survivors.size() < survivorsWanted) {
@@ -70,6 +52,8 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		// TODO just use survivors for newPopulation - why not? avoid dupes, save making another collection
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
+		//int desiredPop = (int) ((double) sortedChromosomes.size() * desiredPopulationSize);
+		//System.out.println("The desired pop size is " + desiredPopulationSize);
 		while (survivors.size() < desiredPopulationSize) {
 			survivors.add(makeOffspring(parentPool));
 		}
@@ -89,15 +73,11 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		Configuration config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
 		topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
-		//desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
-		desiredPopulationSize = 1000;
+		//desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 500);
+		desiredPopulationSize = 100;
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
-		}
-		scorer = new ChromosomeScorer(config.get("cities"));
-		if (scorer.cities.size() < 3) {
-			throw new InterruptedException("Failure! Invalid city map.");
 		}
 	}
 
@@ -110,18 +90,19 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
         });
 
         sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
-
+        int numChroms = 0;
         for (Text chromosomeToParse : scoredChromosomeStrings) {
+        	//System.out.println("chrom to parse is " + chromosomeToParse.toString());
             ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
-            if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
+            if (sortedChromosomes.add(sc)) {
+            	sideEffectSum += sc.score;
+            }
+            numChroms++;
             log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
         }
-
+       // System.out.println("size of scored chrom strings is " + numChroms);
         return sortedChromosomes;
     }
-
-
-
 
 	protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
 		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
@@ -165,8 +146,6 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			if (random.nextDouble() < mutationChance) {
 				mutate(offspring);
 			}
-
-			offspring.score = scorer.score(offspring.chromosome);
 			return offspring;
 		} catch (NullPointerException npe) {
 			log.error("*** NullPointerException in makeOffspring()");

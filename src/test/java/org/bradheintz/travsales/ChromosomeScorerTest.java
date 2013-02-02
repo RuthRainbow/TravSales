@@ -5,6 +5,7 @@
 package org.bradheintz.travsales;
 
 import java.util.ArrayList;
+
 import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
@@ -17,7 +18,7 @@ public class ChromosomeScorerTest {
     ChromosomeScorer scorer = null;
 
     @BeforeTest
-    public void setup() {
+    public void setup() throws InterruptedException {
         scorer = new ChromosomeScorer("0.0,0.0;0.0,1.0;1.0,1.0");
     }
 
@@ -34,7 +35,7 @@ public class ChromosomeScorerTest {
     }
 
     @Test
-    public void getRouteFromChromosome() {
+    public void getRouteFromChromosome() throws InterruptedException {
         ArrayList<Integer> expectedArray = new ArrayList<Integer>(3);
 
         for (int i = 0; i < 3; ++i) { expectedArray.add(i); }
@@ -49,7 +50,7 @@ public class ChromosomeScorerTest {
     }
 
     @Test
-    public void score() {
+    public void score() throws InterruptedException {
         double fitness = scorer.score("0 0");
         Assert.assertEquals(fitness, Math.sqrt(2) * 2.0 - 2.0, 0.00001);
     }

@@ -31,9 +31,11 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
+		//System.out.println("in inner reduce, the key is " + key);
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
 		normalizeScores(sortedChromosomes);
 
+		//System.out.println("sorted chrom size is " + sortedChromosomes.size());
 		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 

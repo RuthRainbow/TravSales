@@ -17,8 +17,8 @@ import org.apache.hadoop.mapreduce.Mapper;
  *
  * The map class should work out a fitness value for each individual and write this as the value.
  */
-public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
-	private int numBins = 10;
+public class InnerMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
+	private int numBins = 100;
 
     private Random random = new Random();
 
@@ -43,7 +43,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     @Override
     protected void setup(Context context) throws IOException, InterruptedException {
         super.setup(context);
-        numBins = context.getConfiguration().getInt("numberOfSelectionBins", 100);
+        numBins = context.getConfiguration().getInt("numberOfSelectionBins", 10);
     }
 
 }
+

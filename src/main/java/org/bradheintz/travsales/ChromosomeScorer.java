@@ -17,16 +17,19 @@ public class ChromosomeScorer {
     final static double SQRT2 = Math.sqrt(2.0);
     protected double maxDistance;
 
-    public ChromosomeScorer(String cityString) {
+    public ChromosomeScorer(String cityString) throws InterruptedException {
         cities = getCitiesFromString(cityString);
         citiesUsed = new ArrayList<Boolean>(cities.size());
         maxDistance = SQRT2 * (cities.size() - 1);
         for (int i = 0; i < cities.size(); ++i) {
             citiesUsed.add(Boolean.FALSE);
         }
+		if (cities.size() < 3) {
+			throw new InterruptedException("Failure! Invalid city map.");
+		}
     }
 
-    protected double score(String chromosomeString) {
+    protected double score(String chromosomeString) throws InterruptedException {
         ArrayList<Integer> route = getRouteFromChromosome(chromosomeString);
         double distance = 0.0;
         for (int i = 1; i < cities.size(); ++i) {
@@ -57,9 +60,12 @@ public class ChromosomeScorer {
         return outList;
     }
 
-    protected ArrayList<Integer> getRouteFromChromosome(String chromosomeString) {
+    protected ArrayList<Integer> getRouteFromChromosome(String chromosomeString) throws InterruptedException {
         String[] geneStrings = chromosomeString.split(" ");
-        // LATER log failure if # of genestrings != # of cities - 1 (& throw appropriate exception)
+        if (geneStrings.length != cities.size() - 1) {
+        	throw new InterruptedException("Failure! Incorrect gene size " + chromosomeString);
+        }
+
         ArrayList<Integer> genes = new ArrayList<Integer>(geneStrings.length + 1);
         for (String geneString : geneStrings) {
             genes.add(Integer.decode(geneString)); // LATER lots more logging and checking and shit here

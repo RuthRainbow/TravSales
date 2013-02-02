@@ -42,8 +42,8 @@ public class ScoringMapper extends Mapper<LongWritable, Text, Text, DoubleWritab
         }
 
         outValue.set(score);
-	outKey.set(chromosome);
-	context.write(outKey, outValue);
+        outKey.set(chromosome);
+        context.write(outKey, outValue);
     }
 
 

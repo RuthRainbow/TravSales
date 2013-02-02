@@ -4,7 +4,9 @@
  */
 package org.bradheintz.travsales;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
@@ -38,11 +40,10 @@ public class TravSalesJob extends Configured implements Tool {
     private static int numCities = 20;
     private static int populationSize = 10000;
     private static int selectionBinSize = 10000;
-    private static float topTierToSave = 0.1f; // TODO
     private static float survivorProportion = 0.3f;
     private static float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static int generations = 5;
+    private static int generations = 10;
 
 
     public static void main(String[] args) throws Exception {
@@ -80,19 +81,20 @@ public class TravSalesJob extends Configured implements Tool {
             System.exit(1);
         }
 
+        // Copy the tmp file across as the initial population should just be scored
         FileUtils.copyDirectory(new File(popPath + "/tmp_0"), new File(popPath + "/population_0_scored"));
 
         for (int generation = 0; generation < generations; ++generation) {
             selectAndReproduce(generation, roadmap);
+            printBestIndividual(generation);
         }
+        printBestIndividual(generations);
 		return 0;
-
     }
 
     protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
-        conf.setFloat("topTierToSave", topTierToSave);
         conf.setInt("selectionBinSize", selectionBinSize);
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
@@ -103,7 +105,6 @@ public class TravSalesJob extends Configured implements Tool {
         job.setOutputValueClass(Text.class);
 
         job.setJarByClass(TravSalesJob.class);
-        job.setPartitionerClass(RandomPartitioner.class);
         job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(SelectionReproductionReducer.class);
 
@@ -124,6 +125,31 @@ public class TravSalesJob extends Configured implements Tool {
 
     private static int numSelectionBins() {
         return populationSize / selectionBinSize;
+    }
+
+    private void printBestIndividual(int generation) throws IOException {
+    	//generation + 1?
+    	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
+    	BufferedReader br = new BufferedReader(new FileReader(inputPath));
+    	double bestFitness = 0;
+    	String bestChromosome = null;
+        try {
+            String line = br.readLine();
+
+            while (line != null) {
+            	String[] fields = line.split("\t");
+            	double fitness = Double.valueOf(fields[1]);
+            	if (fitness > bestFitness) {
+            		bestFitness = fitness;
+            		bestChromosome = fields[0];
+            	}
+                line = br.readLine();
+            }
+        } finally {
+            br.close();
+        }
+
+        System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome + " WITH SCORE " + bestFitness);
     }
 
     protected static ArrayList<double[]> createMap(int numCities) {
