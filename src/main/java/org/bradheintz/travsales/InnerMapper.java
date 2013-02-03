@@ -18,32 +18,24 @@ import org.apache.hadoop.mapreduce.Mapper;
  * The map class should work out a fitness value for each individual and write this as the value.
  */
 public class InnerMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
-	private int numBins = 100;
-
+    protected double migrationChance = 0.01;
     private Random random = new Random();
-
     private VIntWritable outKey = new VIntWritable();
     @Override
     protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-    	// The key is the actual chromosome. The final value is the chromosome score / fitness
-    	// No - key is 0 and value is chromosome & score...
-    	/*Configuration config = context.getConfiguration();
-    	ChromosomeScorer scorer = new ChromosomeScorer(config.get("cities"));
-    	String[] fields = value.toString().split("\t");
-    	double fitness = scorer.score(fields[0]);
-    	Text finalValue = new Text(String.valueOf(key));
-    	DoubleWritable finalKey = new DoubleWritable(fitness);
-    	context.write(finalKey, value);
-    	PROBLEM HERE. Each having his own fitness value sends him to the same reducer.
- */
-    	outKey.set(random.nextInt(numBins));
+    	// The key is the subpop number, the value is the chromosome/score pair
+    	if (random.nextDouble() < migrationChance) {
+    		// TODO unhardcode
+    		outKey.set(Math.abs(random.nextInt()%100));
+    	} else {
+    		outKey.set(Integer.valueOf(key.toString()));
+    	}
         context.write(outKey, value); // shuffle
     }
 
     @Override
     protected void setup(Context context) throws IOException, InterruptedException {
         super.setup(context);
-        numBins = context.getConfiguration().getInt("numberOfSelectionBins", 10);
     }
 
 }
