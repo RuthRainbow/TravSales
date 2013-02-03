@@ -23,7 +23,6 @@ import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -55,7 +54,6 @@ public class TravSalesJob extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
     	Configuration conf = new Configuration();
-        String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
@@ -66,6 +64,8 @@ public class TravSalesJob extends Configured implements Tool {
         System.out.println("initial population created...");
 
         Job job = new Job(conf, "travsales");
+
+        //TODO define key/value format - this is why the key is random in the mapper
 
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(DoubleWritable.class);
@@ -101,6 +101,7 @@ public class TravSalesJob extends Configured implements Tool {
 
         Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
 
+        job.setInputFormatClass(KeyValueFormat.class);
         job.setOutputKeyClass(VIntWritable.class);
         job.setOutputValueClass(Text.class);
 
@@ -176,7 +177,6 @@ public class TravSalesJob extends Configured implements Tool {
         for (int i = 0; i < roadmap.size(); ++i) {
             double[] coords = roadmap.get(i);
             hdfsOut.writeBytes(String.format("%d %g %g\n", i, coords[0], coords[1]));
-
             if (configStringBuilder.length() > 0) {
                 configStringBuilder.append(";");
             }

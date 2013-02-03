@@ -54,6 +54,7 @@ public class InnerJob extends Configured implements Tool {
 
         Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d", generation));
 
+        job.setInputFormatClass(KeyValueFormat.class);
         job.setOutputKeyClass(VIntWritable.class);
         job.setOutputValueClass(Text.class);
 
