@@ -48,6 +48,8 @@ public class TravSalesJob extends Configured implements Tool {
 
     private ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
     private static float lowerBound;
+    private double bestScoreYet;
+    private int noImprovementCount;
 
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
@@ -86,13 +88,22 @@ public class TravSalesJob extends Configured implements Tool {
         // Copy the tmp file across as the initial population should just be scored
         FileUtils.copyDirectory(new File(popPath + "/tmp_0"), new File(popPath + "/population_0_scored"));
 
-        for (int generation = 0; generation < generations; ++generation) {
+        int generation = 0;
+        while (noImprovementCount < 20 && generation < generations) {
             selectAndReproduce(generation, roadmap);
             findTopOnePercent(generation);
-            printBestIndividual(generation, bestChromosomes.get(0));
+            ScoredChromosome bestChromosome = bestChromosomes.get(0);
+            printBestIndividual(generation, bestChromosome);
+            if (bestChromosome.score > bestScoreYet) {
+            	bestScoreYet = bestChromosome.score;
+            	noImprovementCount = 0;
+            } else {
+            	noImprovementCount++;
+            }
+            generation++;
         }
-        findTopOnePercent(generations);
-        printBestIndividual(generations, bestChromosomes.get(0));
+        //findTopOnePercent(generation);
+        //printBestIndividual(generation, bestChromosomes.get(0));
 		return 0;
     }
 
