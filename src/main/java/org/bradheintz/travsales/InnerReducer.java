@@ -16,32 +16,27 @@ import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.log4j.Logger;
 
-/**
- *
- * @author bradheintz
- */
-public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
+//TODO either make both reducers inherit the same methods or just use the same reducer
+public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
 
 	private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
 	private double survivorProportion;
-	private double topTierProportion;
-	private double desiredPopulationSize;
+	private int desiredPopulationSize;
 	protected double sideEffectSum = 0.0;
 	protected double mutationChance = 0.01;
 	protected Random random = new Random();
+	protected ChromosomeScorer scorer;
 	private Text outKey = new Text();
 	private DoubleWritable outValue = new DoubleWritable();
 
-	// Key - chromsome, Value - fitness value.
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
-		//System.out.println("in a reduce, the key is " + key);
+		//System.out.println("in inner reduce, the key is " + key);
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
 		normalizeScores(sortedChromosomes);
 
 		//System.out.println("sorted chrom size is " + sortedChromosomes.size());
 		int survivorsWanted = (int) ((double) sortedChromosomes.size() * survivorProportion);
-		//System.out.println("survivors wanted is " + survivorsWanted);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
 		while (survivors.size() < survivorsWanted) {
@@ -55,9 +50,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			survivors.add(makeOffspring(parentPool));
 		}
 
-		Iterator<ScoredChromosome> iter = survivors.iterator();
-		while (iter.hasNext()) {
-			ScoredChromosome sc = iter.next();
+		for (ScoredChromosome sc : survivors) {
 			outKey.set(sc.chromosome);
 			outValue.set(sc.score);
 			context.write(outKey, outValue);
@@ -69,36 +62,37 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		super.setup(context);
 		Configuration config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
-		topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
-		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
+		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 100);
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
 		}
+		scorer = new ChromosomeScorer(config.get("cities"));
+		if (scorer.cities.size() < 3) {
+			throw new InterruptedException("Failure! Invalid city map.");
+		}
 	}
 
 	protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<Text> scoredChromosomeStrings) {
-        TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
-            @Override
-            public int compare(ScoredChromosome c1, ScoredChromosome c2) {
-                return c1.score.compareTo(c2.score);
-            }
-        });
+		TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
+			@Override
+			public int compare(ScoredChromosome c1, ScoredChromosome c2) {
+				return c1.score.compareTo(c2.score);
+			}
+		});
 
-        sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
-        int numChroms = 0;
-        for (Text chromosomeToParse : scoredChromosomeStrings) {
-        	//System.out.println("chrom to parse is " + chromosomeToParse.toString());
-            ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
-            if (sortedChromosomes.add(sc)) {
-            	sideEffectSum += sc.score;
-            }
-            numChroms++;
-            log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
-        }
-       // System.out.println("size of scored chrom strings is " + numChroms);
-        return sortedChromosomes;
-    }
+		sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
+		Iterator<Text> iter = scoredChromosomeStrings.iterator();
+
+		while (iter.hasNext()) {
+			Text chromosomeToParse = iter.next();
+			ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
+			if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
+			log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
+		}
+
+		return sortedChromosomes;
+	}
 
 	protected void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
 		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
@@ -142,10 +136,15 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			if (random.nextDouble() < mutationChance) {
 				mutate(offspring);
 			}
+
+			// THIS IS WHY I NEED THE INNER REDUCER
+			// TODO make both reducers inherit most methods
+			offspring.score = scorer.score(offspring.chromosome);
+
 			return offspring;
 		} catch (NullPointerException npe) {
 			log.error("*** NullPointerException in makeOffspring()");
-			log.error(String.format("parent 1 index: %d   parent 2 index: %d   pool size: %d", parent1Index, parent2Index, parentPool.size()));
+			log.error(String.format("parent 1 index: %d parent 2 index: %d pool size: %d", parent1Index, parent2Index, parentPool.size()));
 			if (parentPool.get(parent1Index) == null) log.error("parent 1 null!");
 			if (parentPool.get(parent2Index) == null) log.error("parent 2 null!");
 			throw new InterruptedException("null pointer exception in makeOffspring()");
