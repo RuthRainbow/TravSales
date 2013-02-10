@@ -32,7 +32,6 @@ public class InnerJob extends Configured implements Tool {
     private static int generation;
     private static final int numSubPopulations = 10;
 
-    private static ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
     private static float lowerBound;
 
     public static void main(String[] args) throws Exception {
@@ -112,11 +111,11 @@ public class InnerJob extends Configured implements Tool {
         return configStringBuilder.toString();
     }
 
-	private static ArrayList<ScoredChromosome> findTopOnePercent(int generation) throws IOException {
+	private static void findTopOnePercent(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
     	lowerBound = 0;
-    	bestChromosomes.clear();
+    	ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
     	final int topPercent = (int) Math.floor(populationSize/100);
 
         try {
@@ -141,8 +140,6 @@ public class InnerJob extends Configured implements Tool {
         } finally {
             br.close();
         }
-
-        return bestChromosomes;
     }
 
 }

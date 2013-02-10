@@ -46,10 +46,10 @@ public class TravSalesJob extends Configured implements Tool {
     private static final int generations = 500;
     private static final int numSubPopulations = 100;
 
-    private ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
     private static float lowerBound;
     private double bestScoreYet;
     private int noImprovementCount;
+    private ScoredChromosome overallBestChromosome;
 
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
@@ -91,19 +91,18 @@ public class TravSalesJob extends Configured implements Tool {
         int generation = 0;
         while (noImprovementCount < 20 && generation < generations) {
             selectAndReproduce(generation, roadmap);
-            findTopOnePercent(generation);
-            ScoredChromosome bestChromosome = bestChromosomes.get(0);
+            ScoredChromosome bestChromosome = findTopOnePercent(generation);
             printBestIndividual(generation, bestChromosome);
             if (bestChromosome.score > bestScoreYet) {
             	bestScoreYet = bestChromosome.score;
             	noImprovementCount = 0;
+            	overallBestChromosome = bestChromosome;
             } else {
             	noImprovementCount++;
             }
             generation++;
         }
-        //findTopOnePercent(generation);
-        //printBestIndividual(generation, bestChromosomes.get(0));
+        System.out.println("BEST INDIVIDUAL WAS " + overallBestChromosome);
 		return 0;
     }
 
@@ -149,11 +148,11 @@ public class TravSalesJob extends Configured implements Tool {
         System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
     }
 
-    private ArrayList<ScoredChromosome> findTopOnePercent(int generation) throws IOException {
+    private ScoredChromosome findTopOnePercent(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
     	lowerBound = 0;
-    	bestChromosomes.clear();
+    	ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
     	final int topPercent = (int) Math.floor(populationSize/100);
 
         try {
@@ -179,7 +178,7 @@ public class TravSalesJob extends Configured implements Tool {
             br.close();
         }
 
-        return bestChromosomes;
+        return bestChromosomes.get(0);
     }
 
     protected static ArrayList<double[]> createMap(int numCities) {
