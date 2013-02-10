@@ -70,7 +70,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		Configuration config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
 		topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
-		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
+		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 100);
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");

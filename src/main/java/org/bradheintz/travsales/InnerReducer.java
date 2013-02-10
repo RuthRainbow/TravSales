@@ -62,7 +62,7 @@ public class InnerReducer extends Reducer<VIntWritable, Text, Text, DoubleWritab
 		super.setup(context);
 		Configuration config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
-		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 100);
+		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1000);
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");

@@ -24,7 +24,7 @@ public class InnerJob extends Configured implements Tool {
 	// LATER these should all be configurable
     private static final String popPath = "travsales_populations";
     private static final int numCities = 20;
-    private static final int selectionBinSize = 100;
+    private static final int selectionBinSize = 1000;
     private static final int populationSize = 10000;
     private static final float topTierToSave = 0.1f; // TODO
     private static final float survivorProportion = 0.3f;

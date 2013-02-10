@@ -39,7 +39,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static final String popPath = "travsales_populations";
     private static final int numCities = 20;
     private static final int populationSize = 10000;
-    private static final int selectionBinSize = 1000;
+    private static final int selectionBinSize = 100;
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
