@@ -19,13 +19,14 @@ import org.apache.hadoop.util.ToolRunner;
 public class InnerJob extends Configured implements Tool {
 
 	// LATER these should all be configurable
-    private static String popPath = "travsales_populations";
-    private static int numCities = 20;
-    private static int selectionBinSize = 10000;
-    private static float topTierToSave = 0.1f; // TODO
-    private static float survivorProportion = 0.3f;
-    private static float mutationChance = 0.01f;
+    private static final String popPath = "travsales_populations";
+    private static final int numCities = 20;
+    private static final int selectionBinSize = 10000;
+    private static final float topTierToSave = 0.1f; // TODO
+    private static final float survivorProportion = 0.3f;
+    private static final float mutationChance = 0.01f;
     private static int generation;
+    private static final int numSubPopulations = 10;
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new InnerJob(), args);
@@ -49,6 +50,7 @@ public class InnerJob extends Configured implements Tool {
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
         conf.setInt("selectionBinSize", selectionBinSize);
+        conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
 

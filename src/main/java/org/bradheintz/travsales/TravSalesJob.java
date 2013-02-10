@@ -35,14 +35,15 @@ public class TravSalesJob extends Configured implements Tool {
     private static Random random = new Random();
 
     // LATER these should all be configurable
-    private static String popPath = "travsales_populations";
-    private static int numCities = 20;
-    private static int populationSize = 10000;
-    private static int selectionBinSize = 10000;
-    private static float survivorProportion = 0.3f;
-    private static float mutationChance = 0.01f;
+    private static final String popPath = "travsales_populations";
+    private static final int numCities = 20;
+    private static final int populationSize = 10000;
+    private static final int selectionBinSize = 10000;
+    private static final float survivorProportion = 0.3f;
+    private static final float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static int generations = 10;
+    private static final int generations = 10;
+    private static final int numSubPopulations = 100;
 
 
     public static void main(String[] args) throws Exception {
@@ -64,8 +65,6 @@ public class TravSalesJob extends Configured implements Tool {
         System.out.println("initial population created...");
 
         Job job = new Job(conf, "travsales");
-
-        //TODO define key/value format - this is why the key is random in the mapper
 
         job.setOutputKeyClass(Text.class);
         job.setOutputValueClass(DoubleWritable.class);
@@ -96,6 +95,7 @@ public class TravSalesJob extends Configured implements Tool {
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setInt("selectionBinSize", selectionBinSize);
+        conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
 

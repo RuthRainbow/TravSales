@@ -65,8 +65,7 @@ public class KeyValueFormat extends TextInputFormat{
 			 FileSplit split = (FileSplit) genericSplit;
 			 final Path file = split.getPath();
 			 Configuration conf = context.getConfiguration();
-			 // TODO needs to be different for the inner mapper
-			 this.numSubPops = conf.getInt("NumSubPopulations", 10);
+			 this.numSubPops = conf.getInt("numSubPopulations", 10);
 			 this.maxLineLength = conf.getInt("mapred.linerecordreader.maxlength",Integer.MAX_VALUE);
 			 FileSystem fs = file.getFileSystem(conf);
 			 start = split.getStart();

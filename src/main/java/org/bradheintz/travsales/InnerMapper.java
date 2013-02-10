@@ -26,7 +26,8 @@ public class InnerMapper extends Mapper<LongWritable, Text, VIntWritable, Text> 
     	// The key is the subpop number, the value is the chromosome/score pair
     	if (random.nextDouble() < migrationChance) {
     		// TODO unhardcode
-    		outKey.set(Math.abs(random.nextInt()%100));
+    		//outKey.set(Math.abs(random.nextInt()%100));
+    		outKey.set(Math.abs(random.nextInt()%10));
     	} else {
     		outKey.set(Integer.valueOf(key.toString()));
     	}
