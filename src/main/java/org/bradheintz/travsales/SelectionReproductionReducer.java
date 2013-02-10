@@ -52,8 +52,6 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		// TODO just use survivors for newPopulation - why not? avoid dupes, save making another collection
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
-		//int desiredPop = (int) ((double) sortedChromosomes.size() * desiredPopulationSize);
-		//System.out.println("The desired pop size is " + desiredPopulationSize);
 		while (survivors.size() < desiredPopulationSize) {
 			survivors.add(makeOffspring(parentPool));
 		}
@@ -73,8 +71,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		Configuration config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
 		topTierProportion = context.getConfiguration().getFloat("topTierToSave", 0.0f);
-		//desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 500);
-		desiredPopulationSize = 100;
+		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 100);
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
