@@ -70,7 +70,7 @@ public class InnerJob extends Configured implements Tool {
 
         job.setJarByClass(InnerJob.class);
         job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(InnerReducer.class);
+        job.setReducerClass(SelectionReproductionReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));
         FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/population_%d_scored", generation + 1)));

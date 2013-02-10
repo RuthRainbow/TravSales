@@ -89,7 +89,7 @@ public class TravSalesJob extends Configured implements Tool {
         FileUtils.copyDirectory(new File(popPath + "/tmp_0"), new File(popPath + "/population_0_scored"));
 
         int generation = 0;
-        while (noImprovementCount < 20 && generation < generations) {
+        while (noImprovementCount < 50 && generation < generations) {
             selectAndReproduce(generation, roadmap);
             ScoredChromosome bestChromosome = findTopOnePercent(generation);
             printBestIndividual(generation, bestChromosome);
