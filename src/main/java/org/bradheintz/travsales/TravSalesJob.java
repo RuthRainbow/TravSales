@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Random;
 
 import org.apache.commons.io.FileUtils;
@@ -42,9 +43,11 @@ public class TravSalesJob extends Configured implements Tool {
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
     // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static final int generations = 10;
+    private static final int generations = 500;
     private static final int numSubPopulations = 100;
 
+    private ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
+    private static float lowerBound;
 
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
@@ -85,9 +88,11 @@ public class TravSalesJob extends Configured implements Tool {
 
         for (int generation = 0; generation < generations; ++generation) {
             selectAndReproduce(generation, roadmap);
-            printBestIndividual(generation);
+            findTopOnePercent(generation);
+            printBestIndividual(generation, bestChromosomes.get(0));
         }
-        printBestIndividual(generations);
+        findTopOnePercent(generations);
+        printBestIndividual(generations, bestChromosomes.get(0));
 		return 0;
     }
 
@@ -98,6 +103,7 @@ public class TravSalesJob extends Configured implements Tool {
         conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
+        conf.setFloat("lowerBound", lowerBound);
 
         Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
 
@@ -128,21 +134,33 @@ public class TravSalesJob extends Configured implements Tool {
         return populationSize / selectionBinSize;
     }
 
-    private void printBestIndividual(int generation) throws IOException {
-    	//generation + 1?
+    private void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
+        System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
+    }
+
+    private ArrayList<ScoredChromosome> findTopOnePercent(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
-    	double bestFitness = 0;
-    	String bestChromosome = null;
+    	lowerBound = 0;
+    	bestChromosomes.clear();
+    	final int topPercent = (int) Math.floor(populationSize/100);
+
         try {
             String line = br.readLine();
 
             while (line != null) {
             	String[] fields = line.split("\t");
             	double fitness = Double.valueOf(fields[1]);
-            	if (fitness > bestFitness) {
-            		bestFitness = fitness;
-            		bestChromosome = fields[0];
+            	if (bestChromosomes.size() < topPercent) {
+            		bestChromosomes.add(new ScoredChromosome(line));
+            		if (fitness > lowerBound) {
+            			lowerBound = (float) fitness;
+            		}
+            	} else if (fitness > lowerBound) {
+            		bestChromosomes.add(new ScoredChromosome(line));
+            		Collections.sort(bestChromosomes);
+            		bestChromosomes.remove(topPercent);
+            		lowerBound = bestChromosomes.get(topPercent-1).score.floatValue();
             	}
                 line = br.readLine();
             }
@@ -150,7 +168,7 @@ public class TravSalesJob extends Configured implements Tool {
             br.close();
         }
 
-        System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome + " WITH SCORE " + bestFitness);
+        return bestChromosomes;
     }
 
     protected static ArrayList<double[]> createMap(int numCities) {

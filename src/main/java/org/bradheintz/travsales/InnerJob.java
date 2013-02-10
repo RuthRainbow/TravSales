@@ -1,7 +1,10 @@
 package org.bradheintz.travsales;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -22,11 +25,15 @@ public class InnerJob extends Configured implements Tool {
     private static final String popPath = "travsales_populations";
     private static final int numCities = 20;
     private static final int selectionBinSize = 100;
+    private static final int populationSize = 10000;
     private static final float topTierToSave = 0.1f; // TODO
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
     private static int generation;
     private static final int numSubPopulations = 10;
+
+    private static ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
+    private static float lowerBound;
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new InnerJob(), args);
@@ -52,7 +59,9 @@ public class InnerJob extends Configured implements Tool {
         conf.setInt("selectionBinSize", selectionBinSize);
         conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);
+        conf.setFloat("lowerBound", lowerBound);
         conf.set("cities", roadmap);
+
 
         Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d", generation));
 
@@ -61,7 +70,7 @@ public class InnerJob extends Configured implements Tool {
         job.setOutputValueClass(Text.class);
 
         job.setJarByClass(InnerJob.class);
-        job.setMapperClass(InnerMapper.class);
+        job.setMapperClass(SelectionBinMapper.class);
         job.setReducerClass(InnerReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d", generation)));
@@ -72,6 +81,8 @@ public class InnerJob extends Configured implements Tool {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d INNER", generation));
             System.exit(1);
         }
+
+        findTopOnePercent(generation);
     }
 
 	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
@@ -99,6 +110,39 @@ public class InnerJob extends Configured implements Tool {
         hdfsOut = null;
 
         return configStringBuilder.toString();
+    }
+
+	private static ArrayList<ScoredChromosome> findTopOnePercent(int generation) throws IOException {
+    	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
+    	BufferedReader br = new BufferedReader(new FileReader(inputPath));
+    	lowerBound = 0;
+    	bestChromosomes.clear();
+    	final int topPercent = (int) Math.floor(populationSize/100);
+
+        try {
+            String line = br.readLine();
+
+            while (line != null) {
+            	String[] fields = line.split("\t");
+            	double fitness = Double.valueOf(fields[1]);
+            	if (bestChromosomes.size() < topPercent) {
+            		bestChromosomes.add(new ScoredChromosome(line));
+            		if (fitness > lowerBound) {
+            			lowerBound = (float) fitness;
+            		}
+            	} else if (fitness > lowerBound) {
+            		bestChromosomes.add(new ScoredChromosome(line));
+            		Collections.sort(bestChromosomes);
+            		bestChromosomes.remove(topPercent);
+            		lowerBound = bestChromosomes.get(topPercent-1).score.floatValue();
+            	}
+                line = br.readLine();
+            }
+        } finally {
+            br.close();
+        }
+
+        return bestChromosomes;
     }
 
 }
