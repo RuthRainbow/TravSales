@@ -35,19 +35,20 @@ public class TravSalesJob extends Configured implements Tool {
 
     private static Random random = new Random();
 
-    // LATER these should all be configurable
     private static final String popPath = "travsales_populations";
-    private static final int numCities = 20;
-    private static final int populationSize = 10000;
-    private static final int selectionBinSize = 100;
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
-    // LATER have pluggable strategies, but for now, just pick a number of generations
-    private static final int generations = 500;
-    private static final int numSubPopulations = 100;
+    private static final int migrationFrequency = 3;
+    private static final int migrationNumber = 3;
+
+    private static int numCities = 20;
+    private static int populationSize = 10000;
+    private static int selectionBinSize;
+    private static int numSubPopulations;
+    private static int generations = 500;
 
     private static float lowerBound;
-    private double bestScoreYet;
+    private double bestScoreCurrGen;
     private int noImprovementCount;
     private ScoredChromosome overallBestChromosome;
 
@@ -60,6 +61,17 @@ public class TravSalesJob extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
     	Configuration conf = new Configuration();
+
+    	/*if (args != null && args.length == 3) {
+    		numCities = Integer.valueOf(args[0]);
+    		populationSize = Integer.valueOf(args[1]);
+    		generations = Integer.valueOf(args[2]);
+    	} else {
+    		System.out.println("Incorrect args, using default values. Usage: <num. cities> <population size> <max. num. generations>");
+    	}*/
+
+    	selectionBinSize = (int) Math.ceil(populationSize/100);
+    	numSubPopulations = (int) Math.ceil(populationSize/selectionBinSize);
 
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
@@ -91,10 +103,10 @@ public class TravSalesJob extends Configured implements Tool {
         int generation = 0;
         while (noImprovementCount < 50 && generation < generations) {
             selectAndReproduce(generation, roadmap);
-            ScoredChromosome bestChromosome = findTopOnePercent(generation);
+            ScoredChromosome bestChromosome = findMigrationBounds(generation);
             printBestIndividual(generation, bestChromosome);
-            if (bestChromosome.score > bestScoreYet) {
-            	bestScoreYet = bestChromosome.score;
+            if (bestChromosome.score > bestScoreCurrGen) {
+            	bestScoreCurrGen = bestChromosome.score;
             	noImprovementCount = 0;
             	overallBestChromosome = bestChromosome;
             } else {
@@ -114,6 +126,8 @@ public class TravSalesJob extends Configured implements Tool {
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
         conf.setFloat("lowerBound", lowerBound);
+        conf.setInt("migrationFrequency", migrationFrequency);
+        conf.setInt("generation", generation);
 
         Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
 
@@ -134,8 +148,10 @@ public class TravSalesJob extends Configured implements Tool {
             System.exit(1);
         }
 
-        String[] args = new String[1];
+        String[] args = new String[3];
         args[0] = String.valueOf(generation);
+        args[1] = String.valueOf(numCities);
+        args[2] = String.valueOf(populationSize);
         ToolRunner.run(new InnerJob(), args);
         FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d", generation)));
     }
@@ -148,12 +164,11 @@ public class TravSalesJob extends Configured implements Tool {
         System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
     }
 
-    private ScoredChromosome findTopOnePercent(int generation) throws IOException {
+    private ScoredChromosome findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
     	lowerBound = 0;
     	ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
-    	final int topPercent = (int) Math.floor(populationSize/100);
 
         try {
             String line = br.readLine();
@@ -161,7 +176,7 @@ public class TravSalesJob extends Configured implements Tool {
             while (line != null) {
             	String[] fields = line.split("\t");
             	double fitness = Double.valueOf(fields[1]);
-            	if (bestChromosomes.size() < topPercent) {
+            	if (bestChromosomes.size() < migrationNumber) {
             		bestChromosomes.add(new ScoredChromosome(line));
             		if (fitness > lowerBound) {
             			lowerBound = (float) fitness;
@@ -169,8 +184,8 @@ public class TravSalesJob extends Configured implements Tool {
             	} else if (fitness > lowerBound) {
             		bestChromosomes.add(new ScoredChromosome(line));
             		Collections.sort(bestChromosomes);
-            		bestChromosomes.remove(topPercent);
-            		lowerBound = bestChromosomes.get(topPercent-1).score.floatValue();
+            		bestChromosomes.remove(migrationNumber);
+            		lowerBound = bestChromosomes.get(migrationNumber-1).score.floatValue();
             	}
                 line = br.readLine();
             }

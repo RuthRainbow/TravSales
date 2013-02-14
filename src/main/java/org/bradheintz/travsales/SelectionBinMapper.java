@@ -27,10 +27,11 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
 
     	ScoredChromosome sc = new ScoredChromosome(value);
     	float lowerBound = context.getConfiguration().getFloat("lowerBound", Float.MAX_VALUE);
-    	//if (random.nextDouble() < migrationChance) {
-    		//outKey.set(Math.abs(random.nextInt()%10));
-    	//} else
-    	if (sc.score > lowerBound) {
+    	int migrationRate = context.getConfiguration().getInt("migrationRate", 1);
+    	int generation = context.getConfiguration().getInt("generation", 1);
+    	boolean isMigrate = generation%migrationRate == 0 ? true : false;
+
+    	if (isMigrate && sc.score > lowerBound) {
     		broadcastToNeighbours(sc, key, value, context);
     	}
     	// Always send key to it's own reducer (don't remove individuals here)

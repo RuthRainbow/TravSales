@@ -23,17 +23,20 @@ public class InnerJob extends Configured implements Tool {
 
 	// LATER these should all be configurable
     private static final String popPath = "travsales_populations";
-    private static final int numCities = 20;
-    private static final int selectionBinSize = 1000;
-    private static final int populationSize = 10000;
     private static final float topTierToSave = 0.1f; // TODO
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
-    private static int generation;
-    private static final int numSubPopulations = 10;
+    private static final int migrationFrequency = 10;
+    private static final int migrationNumber = 3;
 
+    private static int generation;
+    private static int numCities;
+    private static int populationSize;
+    private static int selectionBinSize;
+    private static int numSubPopulations;
     private static float lowerBound;
 
+    // Args: generation number, number of cities, population size
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new InnerJob(), args);
     }
@@ -46,6 +49,10 @@ public class InnerJob extends Configured implements Tool {
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
 
         generation = Integer.valueOf(args[0]);
+        numCities = Integer.valueOf(args[1]);
+        populationSize = Integer.valueOf(args[2]);
+        selectionBinSize = (int) Math.ceil(populationSize/10);
+        numSubPopulations = (int) Math.ceil(populationSize/selectionBinSize);
 
         selectAndReproduce(generation, roadmap);
 		return 0;
@@ -60,6 +67,8 @@ public class InnerJob extends Configured implements Tool {
         conf.setFloat("mutationChance", mutationChance);
         conf.setFloat("lowerBound", lowerBound);
         conf.set("cities", roadmap);
+        conf.setInt("migrationFrequency", migrationFrequency);
+        conf.setInt("generation", generation);
 
         Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d", generation));
 
@@ -80,7 +89,7 @@ public class InnerJob extends Configured implements Tool {
             System.exit(1);
         }
 
-        findTopOnePercent(generation);
+        findMigrationBounds(generation);
     }
 
 	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
@@ -110,12 +119,11 @@ public class InnerJob extends Configured implements Tool {
         return configStringBuilder.toString();
     }
 
-	private static void findTopOnePercent(int generation) throws IOException {
+	private static void findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
     	lowerBound = 0;
     	ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
-    	final int topPercent = (int) Math.floor(populationSize/100);
 
         try {
             String line = br.readLine();
@@ -123,7 +131,7 @@ public class InnerJob extends Configured implements Tool {
             while (line != null) {
             	String[] fields = line.split("\t");
             	double fitness = Double.valueOf(fields[1]);
-            	if (bestChromosomes.size() < topPercent) {
+            	if (bestChromosomes.size() < migrationNumber) {
             		bestChromosomes.add(new ScoredChromosome(line));
             		if (fitness > lowerBound) {
             			lowerBound = (float) fitness;
@@ -131,8 +139,8 @@ public class InnerJob extends Configured implements Tool {
             	} else if (fitness > lowerBound) {
             		bestChromosomes.add(new ScoredChromosome(line));
             		Collections.sort(bestChromosomes);
-            		bestChromosomes.remove(topPercent);
-            		lowerBound = bestChromosomes.get(topPercent-1).score.floatValue();
+            		bestChromosomes.remove(migrationNumber);
+            		lowerBound = bestChromosomes.get(migrationNumber-1).score.floatValue();
             	}
                 line = br.readLine();
             }
