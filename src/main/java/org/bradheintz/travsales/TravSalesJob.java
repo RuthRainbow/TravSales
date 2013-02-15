@@ -40,6 +40,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static final float mutationChance = 0.01f;
     private static final int migrationFrequency = 3;
     private static final int migrationNumber = 3;
+    private static final Topology topology = Topology.RING;
 
     private static int numCities = 20;
     private static int populationSize = 10000;
@@ -51,6 +52,10 @@ public class TravSalesJob extends Configured implements Tool {
     private double bestScoreCurrGen;
     private int noImprovementCount;
     private ScoredChromosome overallBestChromosome;
+
+    protected enum Topology {
+    	HYPERCUBE, RING
+    }
 
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
@@ -128,6 +133,8 @@ public class TravSalesJob extends Configured implements Tool {
         conf.setFloat("lowerBound", lowerBound);
         conf.setInt("migrationFrequency", migrationFrequency);
         conf.setInt("generation", generation);
+        conf.setEnum("topology", topology);
+        conf.setInt("populationSize", populationSize);
 
         Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
 

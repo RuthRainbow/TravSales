@@ -18,6 +18,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.bradheintz.travsales.TravSalesJob.Topology;
 
 public class InnerJob extends Configured implements Tool {
 
@@ -28,6 +29,7 @@ public class InnerJob extends Configured implements Tool {
     private static final float mutationChance = 0.01f;
     private static final int migrationFrequency = 10;
     private static final int migrationNumber = 3;
+    private static final Topology topology = Topology.HYPERCUBE;
 
     private static int generation;
     private static int numCities;
@@ -69,6 +71,8 @@ public class InnerJob extends Configured implements Tool {
         conf.set("cities", roadmap);
         conf.setInt("migrationFrequency", migrationFrequency);
         conf.setInt("generation", generation);
+        conf.setEnum("topology", topology);
+        conf.setInt("populationSize", populationSize);
 
         Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d", generation));
 
