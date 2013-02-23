@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import org.apache.log4j.Logger;
 
 //TODO either make both reducers inherit the same methods or just use the same reducer
-public class HierarchicalReducer extends SelectionBinReducer {
+public class HierarchicalReducer extends SelectionReproductionReducer {
 
 	private final static Logger log = Logger.getLogger(TopLevelReducer.class);
 

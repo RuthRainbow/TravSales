@@ -46,8 +46,8 @@ public class TravSalesJob extends Configured implements Tool {
     private static int populationSize = 10000;
     private static int selectionBinSize;
     private static int numSubPopulations;
-    private static int generations = 500;
-    private static int numHierarchyLevels = 3;
+    private static int maxGenerations = 500;
+    private static int numHierarchyLevels = 2;
 
     private static float lowerBound;
     private double bestScoreCurrGen;
@@ -61,7 +61,7 @@ public class TravSalesJob extends Configured implements Tool {
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
         ToolRunner.run(new TravSalesJob(), args);
-        FileUtils.deleteDirectory(new File(popPath + "/tmp_" + generations));
+        FileUtils.deleteDirectory(new File(popPath + "/tmp_" + maxGenerations));
     }
 
     @Override
@@ -107,7 +107,7 @@ public class TravSalesJob extends Configured implements Tool {
         FileUtils.copyDirectory(new File(popPath + "/tmp_0_1"), new File(popPath + "/population_0_scored"));
 
         int generation = 0;
-        while (noImprovementCount < 50 && generation < generations) {
+        while (noImprovementCount < 50 && generation < maxGenerations) {
             selectAndReproduce(generation, roadmap);
             ScoredChromosome bestChromosome = findMigrationBounds(generation);
             printBestIndividual(generation, bestChromosome);

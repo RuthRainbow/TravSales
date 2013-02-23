@@ -8,7 +8,7 @@ import org.apache.log4j.Logger;
  *
  * @author bradheintz
  */
-public class TopLevelReducer extends SelectionBinReducer {
+public class TopLevelReducer extends SelectionReproductionReducer {
 
 	private final static Logger log = Logger.getLogger(TopLevelReducer.class);
 

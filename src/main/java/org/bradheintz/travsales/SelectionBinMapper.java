@@ -20,10 +20,10 @@ import org.bradheintz.travsales.TravSalesJob.Topology;
 public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
     private VIntWritable outKey = new VIntWritable();
     private int numSubPopulations;
+    // The key is the subpop number, the value is the chromosome/score pair
     @Override
-    protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-    	// The key is the subpop number, the value is the chromosome/score pair
-
+    protected void map(LongWritable key, Text value, Context context)
+    		throws IOException, InterruptedException {
     	ScoredChromosome sc = new ScoredChromosome(value);
     	Topology topology = context.getConfiguration().getEnum("topology", Topology.RING);
     	float lowerBound = context.getConfiguration().getFloat("lowerBound", Float.MAX_VALUE);
@@ -48,27 +48,32 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
         super.setup(context);
     }
 
-    // TODO don't go outside subpops
-    private void ringBroadcast(ScoredChromosome sc, LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+    private void ringBroadcast(ScoredChromosome sc, LongWritable key, Text value, Context context)
+    		throws IOException, InterruptedException {
     	int keyValue = Integer.valueOf(key.toString());
     	VIntWritable currOutKey = new VIntWritable();
 
-    	if (keyValue > 0) {
-    		currOutKey.set(keyValue - 1);
+    	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 10);
+
+    	// Migrate to the left sub-population
+    	if (keyValue % selectionBinSize == 0) {
+    		currOutKey.set(keyValue + selectionBinSize - 1);
     	} else {
-    		currOutKey.set(numSubPopulations-1);
+    		currOutKey.set(keyValue - 1);
     	}
     	context.write(currOutKey, value);
 
-    	if (keyValue < numSubPopulations-1){
-    		currOutKey.set(keyValue + 1);
+    	// Migrate to the right sub-population
+    	if ((keyValue + 1) % selectionBinSize == 0) {
+    		currOutKey.set(keyValue - selectionBinSize - 1);
     	} else {
-    		currOutKey.set(0);
+    		currOutKey.set(keyValue + 1);
     	}
     	context.write(currOutKey, value);
     }
 
-    private void hypercubeBroadcast(ScoredChromosome sc, LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+    private void hypercubeBroadcast(ScoredChromosome sc, LongWritable key, Text value,
+    		Context context) throws IOException, InterruptedException {
     	int keyValue = Integer.valueOf(key.toString());
     	VIntWritable currOutKey = new VIntWritable();
 
