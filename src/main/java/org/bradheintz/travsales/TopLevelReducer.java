@@ -4,16 +4,21 @@ import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
 
-//TODO either make both reducers inherit the same methods or just use the same reducer
-public class HierarchicalReducer extends SelectionBinReducer {
+/**
+ *
+ * @author bradheintz
+ */
+public class TopLevelReducer extends SelectionBinReducer {
 
 	private final static Logger log = Logger.getLogger(TopLevelReducer.class);
 
 	protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException {
 		int parent1Index = random.nextInt(parentPool.size());
 		int parent2Index = parent1Index;
-		while (parent2Index == parent1Index) {
-			parent2Index = random.nextInt(parentPool.size());
+		if (parentPool.size() > 1) {
+			while (parent2Index == parent1Index) {
+				parent2Index = random.nextInt(parentPool.size());
+			}
 		}
 
 		try {
@@ -26,13 +31,10 @@ public class HierarchicalReducer extends SelectionBinReducer {
 			if (random.nextDouble() < mutationChance) {
 				mutate(offspring);
 			}
-
-			offspring.score = scorer.score(offspring.chromosome);
-
 			return offspring;
 		} catch (NullPointerException npe) {
 			log.error("*** NullPointerException in makeOffspring()");
-			log.error(String.format("parent 1 index: %d parent 2 index: %d pool size: %d", parent1Index, parent2Index, parentPool.size()));
+			log.error(String.format("parent 1 index: %d   parent 2 index: %d   pool size: %d", parent1Index, parent2Index, parentPool.size()));
 			if (parentPool.get(parent1Index) == null) log.error("parent 1 null!");
 			if (parentPool.get(parent2Index) == null) log.error("parent 2 null!");
 			throw new InterruptedException("null pointer exception in makeOffspring()");

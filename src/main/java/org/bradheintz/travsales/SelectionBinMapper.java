@@ -38,7 +38,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     			case HYPERCUBE: hypercubeBroadcast(sc, key, value, context); break;
     		}
     	}
-    	// Always send key to it's own reducer (don't remove individuals here)
+    	// Always send key to it's own reducer (don't remove individuals from subpopulations here)
     	outKey.set(Integer.valueOf(key.toString()));
         context.write(outKey, value);
     }

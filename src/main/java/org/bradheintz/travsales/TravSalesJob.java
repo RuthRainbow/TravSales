@@ -47,6 +47,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static int selectionBinSize;
     private static int numSubPopulations;
     private static int generations = 500;
+    private static int numHierarchyLevels = 3;
 
     private static float lowerBound;
     private double bestScoreCurrGen;
@@ -75,8 +76,8 @@ public class TravSalesJob extends Configured implements Tool {
     		System.out.println("Incorrect args, using default values. Usage: <num. cities> <population size> <max. num. generations>");
     	}*/
 
-    	selectionBinSize = (int) Math.ceil(populationSize/100);
-    	numSubPopulations = (int) Math.ceil(populationSize/selectionBinSize);
+    	numSubPopulations = (int) Math.pow(10, numHierarchyLevels);
+    	selectionBinSize = (int) populationSize/numSubPopulations;
 
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
@@ -95,7 +96,7 @@ public class TravSalesJob extends Configured implements Tool {
         job.setMapperClass(ScoringMapper.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + "/population_0"));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + "/tmp_0"));
+        FileOutputFormat.setOutputPath(job, new Path(popPath + "/tmp_0_1"));
 
         if (!job.waitForCompletion(true)) {
             System.out.println("Failure scoring first generation");
@@ -103,7 +104,7 @@ public class TravSalesJob extends Configured implements Tool {
         }
 
         // Copy the tmp file across as the initial population should just be scored
-        FileUtils.copyDirectory(new File(popPath + "/tmp_0"), new File(popPath + "/population_0_scored"));
+        FileUtils.copyDirectory(new File(popPath + "/tmp_0_1"), new File(popPath + "/population_0_scored"));
 
         int generation = 0;
         while (noImprovementCount < 50 && generation < generations) {
@@ -144,27 +145,32 @@ public class TravSalesJob extends Configured implements Tool {
 
         job.setJarByClass(TravSalesJob.class);
         job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(SelectionReproductionReducer.class);
+        job.setReducerClass(TopLevelReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d", generation + 1)));
+        FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d_1", generation + 1)));
 
-        System.out.println(String.format("Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
+        // Work with the innermost
+        System.out.println(String.format("Hierarchy level 1: Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
         if (!job.waitForCompletion(true)) {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
             System.exit(1);
         }
 
-        String[] args = new String[3];
-        args[0] = String.valueOf(generation);
-        args[1] = String.valueOf(numCities);
-        args[2] = String.valueOf(populationSize);
-        ToolRunner.run(new InnerJob(), args);
-        FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d", generation)));
-    }
+        // Args for new job: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level> <final hierarchy level?>
+        String[] args = new String[6];
+        for (int i = 1; i < numHierarchyLevels; i++) {
+        	args[0] = String.valueOf(generation);
+        	args[1] = String.valueOf(numCities);
+        	args[2] = String.valueOf(populationSize);
+        	args[3] = String.valueOf((int) Math.pow(10, numHierarchyLevels-i));
+        	// hierarchy indexes start from 0
+        	args[4] = String.valueOf(i+1);
+        	args[5] = (i + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
+        	ToolRunner.run(new HierarchicalJob(), args);
+        }
 
-    private static int numSelectionBins() {
-        return populationSize / selectionBinSize;
+        FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d", generation)));
     }
 
     private void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
