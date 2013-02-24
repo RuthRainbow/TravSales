@@ -27,7 +27,7 @@ public class HierarchicalJob extends Configured implements Tool {
     private static final float topTierToSave = 0.1f; // TODO
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
-    private static final int migrationFrequency = 10;
+    private static final int migrationFrequency = 10; // Should change based on hierarchy level
     private static final int migrationNumber = 3;
     private static final Topology topology = Topology.HYPERCUBE;
 

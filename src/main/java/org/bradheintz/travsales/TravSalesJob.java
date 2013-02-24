@@ -35,7 +35,6 @@ public class TravSalesJob extends Configured implements Tool {
 
     private static Random random = new Random();
 
-    private static final String popPath = "travsales_populations";
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
     private static final int migrationFrequency = 3;
@@ -48,6 +47,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static int numSubPopulations;
     private static int maxGenerations = 500;
     private static int numHierarchyLevels = 2;
+    private static String popPath = "travsales_populations";
 
     private static float lowerBound;
     private double bestScoreCurrGen;
@@ -55,7 +55,23 @@ public class TravSalesJob extends Configured implements Tool {
     private ScoredChromosome overallBestChromosome;
 
     protected enum Topology {
-    	HYPERCUBE, RING
+    	HYPERCUBE, RING;
+    }
+
+    // Not sure if char needs to be saved
+    private enum Option {
+    	NUMCITIES('c'),
+    	POPULATIONSIZE('s'),
+    	MAXNUMGENERATIONS('g'),
+    	NUMHIERARCHYLEVELS('h'),
+    	MUTATIONCHANCE('m'),
+    	FILEPATH('f');
+
+    	protected final char shortcut;
+
+    	Option(char shortcut) {
+    		this.shortcut = shortcut;
+    	}
     }
 
     public static void main(String[] args) throws Exception {
@@ -68,6 +84,9 @@ public class TravSalesJob extends Configured implements Tool {
     public int run(String[] args) throws Exception {
     	Configuration conf = new Configuration();
 
+    	if (args != null) {
+    		parseArgs(args);
+    	}
     	/*if (args != null && args.length == 3) {
     		numCities = Integer.valueOf(args[0]);
     		populationSize = Integer.valueOf(args[1]);
@@ -124,7 +143,79 @@ public class TravSalesJob extends Configured implements Tool {
 		return 0;
     }
 
-    protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
+    private void parseArgs(String[] args) {
+    	Option chosenOption = null;
+    	int num = -1;
+    	String str = null;
+    	for (int i = 0; i < args.length; i+=2) {
+    		if (!args[0].startsWith("-")) {
+    			System.out.println("Incorrect formatting - " +
+    					"all parameters must begin with a '-' character");
+    			System.exit(1);
+    		}
+
+    		String optionsString = args[0].substring(1);
+    		try {
+    			chosenOption = Option.valueOf(optionsString);
+    		} catch (IllegalArgumentException e) {
+    			chosenOption = tryShortcut(optionsString);
+    			if (chosenOption == null) {
+    				System.out.println("Incorrect formatting - not a valid parameter");
+    				System.exit(1);
+    			}
+    		}
+
+    		if (args.length <= i+1) {
+    			System.out.println("Incorrect formatting - all parameters must have a value");
+    			System.exit(1);
+    		} else if (args[i+1].matches("[0-9]+")) {
+    			num = Integer.valueOf(args[i+1]);
+			} else {
+				str = args[i+1];
+			}
+
+    		switch (chosenOption) {
+    			case NUMCITIES : numCities = checkValid(num, chosenOption); break;
+    			case POPULATIONSIZE : populationSize = checkValid(num, chosenOption); break;
+    			case MAXNUMGENERATIONS : maxGenerations = checkValid(num, chosenOption); break;
+    			case NUMHIERARCHYLEVELS : numHierarchyLevels = checkValid(num, chosenOption); break;
+    			case FILEPATH : popPath = checkValid(str); break;
+    			default: break;
+    		}
+    	}
+	}
+
+	private int checkValid(int num, Option parameter) {
+		//TODO popsize must also be a multiple of 10, cannot have too many hierarchies etc'
+		//TODO make this error statement better
+		if (num < 0) {
+			System.out.println("Incorrect formatting - parameter " + parameter + " must be a positive integer");
+			System.exit(1);
+		}
+		return num;
+	}
+
+	private String checkValid(String str) {
+		if (str == null) {
+			System.out.println("Incorrect formatting - the file path must be a string");
+			System.exit(1);
+		}
+		return str;
+	}
+
+	// Return the option the corresponds to the shortcut, or return null
+	private Option tryShortcut(String parameter) {
+		switch (parameter) {
+			case "c" : return Option.NUMCITIES;
+			case "s" : return Option.POPULATIONSIZE;
+			case "g" : return Option.MAXNUMGENERATIONS;
+			case "h" : return Option.NUMHIERARCHYLEVELS;
+			case "f" : return Option.FILEPATH;
+			default : return null;
+		}
+	}
+
+	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setInt("selectionBinSize", selectionBinSize);
@@ -148,7 +239,11 @@ public class TravSalesJob extends Configured implements Tool {
         job.setReducerClass(TopLevelReducer.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d_1", generation + 1)));
+        if (numHierarchyLevels == 1) {
+        	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/population_%d_scored", generation + 1)));
+        } else {
+        	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d_1", generation)));
+        }
 
         // Work with the innermost
         System.out.println(String.format("Hierarchy level 1: Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
