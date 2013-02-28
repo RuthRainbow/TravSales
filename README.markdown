@@ -1,17 +1,17 @@
 Project forked from: 
 
 ***
-TravSales
+#TravSales
 =========
 
 A parallelized genetic algorithm attack on the Traveling Salesman problem. See [my related blog post](http://www.kickasslabs.com/2011/10/10/traveling-salesman-attack/ "Traveling Salesman Attack").
 
-License
+##License
 -------
 
 This software is released under the [Apache License, version 2.0](http://www.apache.org/licenses/LICENSE-2.0 "Apache License 2.0").
 
-Notes
+##Notes
 -----
 
 See the TODO file in this directory for a sort of sketchy roadmap of intended improvements.
@@ -19,7 +19,8 @@ See the TODO file in this directory for a sort of sketchy roadmap of intended im
 
 My plan is to convert this into a hierarchical genetic algorithm. At the moment the implementation involves two jobs chained together.
 
-Command line parameters:
+##Command line parameters
+-----
 -numCities or -c : set the number of cities.  
 -populationSize or -s : set the population size (must be a multiple of 10).  
 -maxNumGenerations or -g : set the maximum number of generations the algorithm iterates over.  

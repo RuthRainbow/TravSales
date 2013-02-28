@@ -5,8 +5,10 @@
 package org.bradheintz.travsales;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -115,7 +117,7 @@ public class TravSalesJob extends Configured implements Tool {
         job.setMapperClass(ScoringMapper.class);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + "/population_0"));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + "/tmp_0_1"));
+        FileOutputFormat.setOutputPath(job, new Path(popPath + "/tmp_0_0"));
 
         if (!job.waitForCompletion(true)) {
             System.out.println("Failure scoring first generation");
@@ -123,7 +125,7 @@ public class TravSalesJob extends Configured implements Tool {
         }
 
         // Copy the tmp file across as the initial population should just be scored
-        FileUtils.copyDirectory(new File(popPath + "/tmp_0_1"), new File(popPath + "/population_0_scored"));
+        FileUtils.copyDirectory(new File(popPath + "/tmp_0_0"), new File(popPath + "/population_0_scored"));
 
         int generation = 0;
         while (noImprovementCount < 50 && generation < maxGenerations) {
@@ -140,10 +142,11 @@ public class TravSalesJob extends Configured implements Tool {
             generation++;
         }
         System.out.println("BEST INDIVIDUAL WAS " + overallBestChromosome);
+        writeResultToFile();
 		return 0;
     }
 
-    private void parseArgs(String[] args) {
+	private void parseArgs(String[] args) {
     	Option chosenOption = null;
     	int num = -1;
     	String str = null;
@@ -271,6 +274,26 @@ public class TravSalesJob extends Configured implements Tool {
     private void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
         System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
     }
+
+    private void writeResultToFile() {
+    	try {
+			String content = overallBestChromosome.toString();
+			File file = new File(popPath + "/result");
+
+			// if file doesnt exists, then create it
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			FileWriter fw = new FileWriter(file.getAbsoluteFile());
+			BufferedWriter bw = new BufferedWriter(fw);
+			bw.write(content);
+			bw.close();
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
     private ScoredChromosome findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
