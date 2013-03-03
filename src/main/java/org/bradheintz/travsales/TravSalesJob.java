@@ -42,17 +42,17 @@ public class TravSalesJob extends Configured implements Tool {
     private static Random random = new Random();
 
     private static final float survivorProportion = 0.3f;
-    private static final float mutationChance = 0.01f;
     private static final int migrationFrequency = 3;
     private static final int migrationNumber = 3;
     private static final Topology topology = Topology.RING;
+    private static final int numCities = 20;
 
-    private static int numCities = 20;
     private static int populationSize = 10000;
     private static int selectionBinSize;
     private static int numSubPopulations;
     private static int maxGenerations = 500;
     private static int numHierarchyLevels = 3;
+    private static float mutationChance = 0.01f;
     private static String popPath = "travsales_populations";
 
     private static float[] lowerBounds;
@@ -65,17 +65,23 @@ public class TravSalesJob extends Configured implements Tool {
     }
 
     private enum Option {
-    	NUMCITIES('c'),
-    	POPULATIONSIZE('s'),
-    	MAXNUMGENERATIONS('g'),
-    	NUMHIERARCHYLEVELS('h'),
-    	MUTATIONCHANCE('m'),
-    	FILEPATH('f');
+    	POPULATIONSIZE('s', "population size"),
+    	MAXNUMGENERATIONS('g', "maximum number of generations"),
+    	NUMHIERARCHYLEVELS('h', "number of hierarchy levels"),
+    	MUTATIONCHANCE('m', "mutation chance"),
+    	FILEPATH('f', "filepath");
 
     	protected final char shortcut;
+    	private final String humanReadable;
 
-    	Option(char shortcut) {
+    	Option(char shortcut, String str) {
     		this.shortcut = shortcut;
+    		this.humanReadable = str;
+    	}
+
+    	@Override
+    	public String toString() {
+    		return humanReadable;
     	}
     }
 
@@ -91,6 +97,7 @@ public class TravSalesJob extends Configured implements Tool {
 
     	if (args != null) {
     		parseArgs(args);
+    		validateArgs();
     	}
 
     	numSubPopulations = (int) Math.pow(10, numHierarchyLevels);
@@ -143,7 +150,6 @@ public class TravSalesJob extends Configured implements Tool {
         writeResultToFile();
 		return 0;
     }
-
 
 	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
         Configuration conf = new Configuration();
@@ -209,19 +215,20 @@ public class TravSalesJob extends Configured implements Tool {
 	}
 
     private void parseArgs(String[] args) {
-    	Option chosenOption = null;
     	int num = -1;
+    	float dec = -1;
     	String str = null;
     	for (int i = 0; i < args.length; i+=2) {
+    		Option chosenOption = null;
     		if (!args[0].startsWith("-")) {
     			System.out.println("Incorrect formatting - " +
     					"all parameters must begin with a '-' character");
     			System.exit(1);
     		}
 
-    		String optionsString = args[0].substring(1);
+    		String optionsString = args[i].substring(1);
     		try {
-    			chosenOption = Option.valueOf(optionsString);
+    			chosenOption = Option.valueOf(optionsString.toUpperCase());
     		} catch (IllegalArgumentException e) {
     			chosenOption = tryShortcut(optionsString);
     			if (chosenOption == null) {
@@ -235,24 +242,25 @@ public class TravSalesJob extends Configured implements Tool {
     			System.exit(1);
     		} else if (args[i+1].matches("[0-9]+")) {
     			num = Integer.valueOf(args[i+1]);
+			} else if (args[i+1].matches("[0-9]*.[0-9]+")) {
+				dec = Float.valueOf(args[i+1]);
 			} else {
 				str = args[i+1];
 			}
 
     		switch (chosenOption) {
-    			case NUMCITIES : numCities = checkValid(num, chosenOption); break;
     			case POPULATIONSIZE : populationSize = checkValid(num, chosenOption); break;
     			case MAXNUMGENERATIONS : maxGenerations = checkValid(num, chosenOption); break;
     			case NUMHIERARCHYLEVELS : numHierarchyLevels = checkValid(num, chosenOption); break;
-    			case FILEPATH : popPath = checkValid(str); break;
+    			case MUTATIONCHANCE : mutationChance = checkValid(dec, chosenOption); break;
+    			case FILEPATH : popPath = checkValid(str, chosenOption); break;
     			default: break;
     		}
     	}
 	}
 
 	private int checkValid(int num, Option parameter) {
-		//TODO popsize must also be a multiple of 10, cannot have too many hierarchies etc'
-		//TODO make this error statement better
+		//TODO cannot have too many hierarchies etc'
 		if (num < 0) {
 			System.out.println("Incorrect formatting - parameter " + parameter + " must be a positive integer");
 			System.exit(1);
@@ -260,26 +268,41 @@ public class TravSalesJob extends Configured implements Tool {
 		return num;
 	}
 
-	private String checkValid(String str) {
+	private String checkValid(String str, Option parameter) {
 		if (str == null) {
-			System.out.println("Incorrect formatting - the file path must be a string");
+			System.out.println("Incorrect formatting - parameter " + parameter + " must be a string");
 			System.exit(1);
 		}
 		return str;
 	}
 
+	private float checkValid(float num, Option parameter) {
+		if (num > 1) {
+			System.out.println("Incorrect formatting - parameter " + parameter + " must be a float between 0 and 1");
+			System.exit(1);
+		}
+		return num;
+	}
+
+	private void validateArgs() {
+		if (Math.pow(10, numHierarchyLevels+1) > populationSize) {
+			System.out.println("Incorrect format - population size must be greater than 10 to the " +
+					"power of the number of hierarchy levels, as the minimum size of sub-populations is 10");
+			System.exit(1);
+		}
+	}
+
 	// Return the option the corresponds to the shortcut, or return null
 	private Option tryShortcut(String parameter) {
 		switch (parameter) {
-			case "c" : return Option.NUMCITIES;
 			case "s" : return Option.POPULATIONSIZE;
 			case "g" : return Option.MAXNUMGENERATIONS;
 			case "h" : return Option.NUMHIERARCHYLEVELS;
+			case "m" : return Option.MUTATIONCHANCE;
 			case "f" : return Option.FILEPATH;
 			default : return null;
 		}
 	}
-
 
 	private void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
         System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
