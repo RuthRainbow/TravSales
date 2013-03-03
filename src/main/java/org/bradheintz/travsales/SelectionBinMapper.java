@@ -30,7 +30,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	float lowerBound = context.getConfiguration().getFloat("lowerBound" + keyValue, Float.MAX_VALUE);
     	numSubPopulations = context.getConfiguration().getInt("numSubPopulations", 1);
     	int migrationRate = context.getConfiguration().getInt("migrationRate", 1);
-    	boolean isMigrate = migrationRate == 0 ? true : false;
+    	int generation = context.getConfiguration().getInt("generation", 1);
+    	boolean isMigrate = generation%migrationRate == 0 ? true : false;
 
     	if (isMigrate && sc.score > lowerBound) {
     		switch (topology) {
