@@ -48,7 +48,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static int selectionBinSize;
     private static int numSubPopulations;
     private static int maxGenerations = 500;
-    private static int numHierarchyLevels = 2;
+    private static int numHierarchyLevels = 3;
     private static String popPath = "travsales_populations";
 
     private static float lowerBound;
@@ -79,7 +79,7 @@ public class TravSalesJob extends Configured implements Tool {
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
         ToolRunner.run(new TravSalesJob(), args);
-        FileUtils.deleteDirectory(new File(popPath + "/tmp_" + maxGenerations));
+        FileUtils.deleteDirectory(new File(popPath + "/tmp_0_0"));
     }
 
     @Override
@@ -89,13 +89,6 @@ public class TravSalesJob extends Configured implements Tool {
     	if (args != null) {
     		parseArgs(args);
     	}
-    	/*if (args != null && args.length == 3) {
-    		numCities = Integer.valueOf(args[0]);
-    		populationSize = Integer.valueOf(args[1]);
-    		generations = Integer.valueOf(args[2]);
-    	} else {
-    		System.out.println("Incorrect args, using default values. Usage: <num. cities> <population size> <max. num. generations>");
-    	}*/
 
     	numSubPopulations = (int) Math.pow(10, numHierarchyLevels);
     	selectionBinSize = (int) populationSize/numSubPopulations;
@@ -142,11 +135,72 @@ public class TravSalesJob extends Configured implements Tool {
             generation++;
         }
         System.out.println("BEST INDIVIDUAL WAS " + overallBestChromosome);
+        // MAY HAVE TO HAVE THIS ON HDFS?
         writeResultToFile();
 		return 0;
     }
 
-	private void parseArgs(String[] args) {
+
+	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
+        Configuration conf = new Configuration();
+        conf.setFloat("survivorProportion", survivorProportion);
+        conf.setInt("selectionBinSize", selectionBinSize);
+        conf.setInt("numSubPopulations", numSubPopulations);
+        conf.setFloat("mutationChance", mutationChance);
+        conf.set("cities", roadmap);
+        conf.setFloat("lowerBound", lowerBound);
+        conf.setInt("migrationFrequency", migrationFrequency);
+        conf.setInt("generation", generation);
+        conf.setEnum("topology", topology);
+        conf.setInt("populationSize", populationSize);
+
+        Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
+
+        job.setInputFormatClass(KeyValueFormat.class);
+        job.setOutputKeyClass(VIntWritable.class);
+        job.setOutputValueClass(Text.class);
+
+        job.setJarByClass(TravSalesJob.class);
+        job.setMapperClass(SelectionBinMapper.class);
+        job.setReducerClass(TopLevelReducer.class);
+
+        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
+        if (numHierarchyLevels == 1) {
+        	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/population_%d_scored", generation + 1)));
+        } else {
+        	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d_1", generation)));
+        }
+
+        System.out.println(String.format("Hierarchy level 1: Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
+        if (!job.waitForCompletion(true)) {
+            System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
+            System.exit(1);
+        }
+
+        runNextLevel(generation);
+
+        for (int i = 1; i < numHierarchyLevels; i++) {
+        	FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d_%d", generation, i)));
+        }
+    }
+
+    private static void runNextLevel(int generation) throws Exception {
+        // Args for new job: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level> <final hierarchy level?>
+        String[] args = new String[6];
+        for (int i = 1; i < numHierarchyLevels; i++) {
+        	args[0] = String.valueOf(generation);
+        	args[1] = String.valueOf(numCities);
+        	args[2] = String.valueOf(populationSize);
+        	args[3] = String.valueOf((int) Math.pow(10, numHierarchyLevels-i));
+        	// hierarchy indexes start from 0
+        	args[4] = String.valueOf(i+1);
+        	args[5] = (i + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
+        	// TODO maybe this doesn't work well for many hierarchies - in parallel?
+        	ToolRunner.run(new HierarchicalJob(), args);
+        }
+	}
+
+    private void parseArgs(String[] args) {
     	Option chosenOption = null;
     	int num = -1;
     	String str = null;
@@ -218,60 +272,8 @@ public class TravSalesJob extends Configured implements Tool {
 		}
 	}
 
-	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
-        Configuration conf = new Configuration();
-        conf.setFloat("survivorProportion", survivorProportion);
-        conf.setInt("selectionBinSize", selectionBinSize);
-        conf.setInt("numSubPopulations", numSubPopulations);
-        conf.setFloat("mutationChance", mutationChance);
-        conf.set("cities", roadmap);
-        conf.setFloat("lowerBound", lowerBound);
-        conf.setInt("migrationFrequency", migrationFrequency);
-        conf.setInt("generation", generation);
-        conf.setEnum("topology", topology);
-        conf.setInt("populationSize", populationSize);
 
-        Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
-
-        job.setInputFormatClass(KeyValueFormat.class);
-        job.setOutputKeyClass(VIntWritable.class);
-        job.setOutputValueClass(Text.class);
-
-        job.setJarByClass(TravSalesJob.class);
-        job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(TopLevelReducer.class);
-
-        FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/population_%d_scored", generation)));
-        if (numHierarchyLevels == 1) {
-        	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/population_%d_scored", generation + 1)));
-        } else {
-        	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d_1", generation)));
-        }
-
-        // Work with the innermost
-        System.out.println(String.format("Hierarchy level 1: Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
-        if (!job.waitForCompletion(true)) {
-            System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
-            System.exit(1);
-        }
-
-        // Args for new job: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level> <final hierarchy level?>
-        String[] args = new String[6];
-        for (int i = 1; i < numHierarchyLevels; i++) {
-        	args[0] = String.valueOf(generation);
-        	args[1] = String.valueOf(numCities);
-        	args[2] = String.valueOf(populationSize);
-        	args[3] = String.valueOf((int) Math.pow(10, numHierarchyLevels-i));
-        	// hierarchy indexes start from 0
-        	args[4] = String.valueOf(i+1);
-        	args[5] = (i + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
-        	ToolRunner.run(new HierarchicalJob(), args);
-        }
-
-        FileUtils.deleteDirectory(new File(popPath + String.format("/tmp_%d", generation)));
-    }
-
-    private void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
+	private void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
         System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
     }
 
@@ -295,6 +297,7 @@ public class TravSalesJob extends Configured implements Tool {
 		}
 	}
 
+    // TODO problem: takes best overall rather than best from each subpop - how to know which subpop he is in
     private ScoredChromosome findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));

@@ -22,7 +22,6 @@ import org.bradheintz.travsales.TravSalesJob.Topology;
 
 public class HierarchicalJob extends Configured implements Tool {
 
-	// LATER these should all be configurable
     private static final String popPath = "travsales_populations";
     private static final float topTierToSave = 0.1f; // TODO
     private static final float survivorProportion = 0.3f;
@@ -40,7 +39,6 @@ public class HierarchicalJob extends Configured implements Tool {
     private static int hierarchyLevel;
     private static boolean finalHierarchyLevel;
 
-    // Args: generation number, number of cities, population size
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new HierarchicalJob(), args);
     }
@@ -52,6 +50,7 @@ public class HierarchicalJob extends Configured implements Tool {
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
 
+        // Args: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level> <final hierarchy level?>
         generation = Integer.valueOf(args[0]);
         numCities = Integer.valueOf(args[1]);
         populationSize = Integer.valueOf(args[2]);
@@ -78,7 +77,7 @@ public class HierarchicalJob extends Configured implements Tool {
         conf.setEnum("topology", topology);
         conf.setInt("populationSize", populationSize);
 
-        Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d", generation));
+        Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d_%d", generation, hierarchyLevel));
 
         job.setInputFormatClass(KeyValueFormat.class);
         job.setOutputKeyClass(VIntWritable.class);
@@ -132,6 +131,7 @@ public class HierarchicalJob extends Configured implements Tool {
         return configStringBuilder.toString();
     }
 
+	// TODO Is this just the same as from the job? Could just pass as an arg...
 	private static void findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
