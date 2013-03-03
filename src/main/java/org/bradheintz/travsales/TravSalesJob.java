@@ -12,6 +12,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.apache.commons.io.FileUtils;
@@ -51,7 +54,7 @@ public class TravSalesJob extends Configured implements Tool {
     private static int numHierarchyLevels = 3;
     private static String popPath = "travsales_populations";
 
-    private static float lowerBound;
+    private static float[] lowerBounds;
     private double bestScoreCurrGen;
     private int noImprovementCount;
     private ScoredChromosome overallBestChromosome;
@@ -92,6 +95,7 @@ public class TravSalesJob extends Configured implements Tool {
 
     	numSubPopulations = (int) Math.pow(10, numHierarchyLevels);
     	selectionBinSize = (int) populationSize/numSubPopulations;
+    	lowerBounds = new float[numSubPopulations];
 
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
@@ -148,11 +152,13 @@ public class TravSalesJob extends Configured implements Tool {
         conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);
         conf.set("cities", roadmap);
-        conf.setFloat("lowerBound", lowerBound);
         conf.setInt("migrationFrequency", migrationFrequency);
         conf.setInt("generation", generation);
         conf.setEnum("topology", topology);
         conf.setInt("populationSize", populationSize);
+        for (int i = 0; i < lowerBounds.length; i++) {
+        	conf.setFloat("lowerBound" + i, lowerBounds[i]);
+        }
 
         Job job = new Job(conf, String.format("travsales_select_and_reproduce_%d", generation));
 
@@ -297,37 +303,62 @@ public class TravSalesJob extends Configured implements Tool {
 		}
 	}
 
-    // TODO problem: takes best overall rather than best from each subpop - how to know which subpop he is in
+    // Finds the lower bound on migration for every sub-population
     private ScoredChromosome findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
-    	lowerBound = 0;
-    	ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
+    	ScoredChromosome bestChromosome = null;
+    	Map<Integer, List<ScoredChromosome>> bestChromosomes =
+    			new HashMap<Integer, List<ScoredChromosome>>();
+    	int pos = 0;
+    	int currSubPop = pos % numSubPopulations;
 
         try {
             String line = br.readLine();
 
             while (line != null) {
+            	currSubPop = pos % numSubPopulations;
+
             	String[] fields = line.split("\t");
             	double fitness = Double.valueOf(fields[1]);
-            	if (bestChromosomes.size() < migrationNumber) {
-            		bestChromosomes.add(new ScoredChromosome(line));
-            		if (fitness > lowerBound) {
-            			lowerBound = (float) fitness;
+            	if (!bestChromosomes.containsKey(currSubPop)) {
+            		bestChromosomes.put(currSubPop, new ArrayList<ScoredChromosome>());
+            	}
+            	if (bestChromosome == null) {
+            		bestChromosome = new ScoredChromosome(line);
+            	}
+
+            	if (bestChromosomes.get(currSubPop).size() < migrationNumber) {
+            		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
+            		ScoredChromosome currChromosome = new ScoredChromosome(line);
+            		currList.add(currChromosome);
+            		bestChromosomes.put(currSubPop, currList);
+            		lowerBounds[currSubPop] = (float) fitness;
+
+            		if (currChromosome.score > bestChromosome.score) {
+            			bestChromosome = currChromosome;
             		}
-            	} else if (fitness > lowerBound) {
-            		bestChromosomes.add(new ScoredChromosome(line));
-            		Collections.sort(bestChromosomes);
-            		bestChromosomes.remove(migrationNumber);
-            		lowerBound = bestChromosomes.get(migrationNumber-1).score.floatValue();
+            	} else if (fitness > lowerBounds[currSubPop]) {
+            		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
+            		ScoredChromosome currChromosome = new ScoredChromosome(line);
+            		currList.add(currChromosome);
+            		Collections.sort(currList);
+            		currList.remove(migrationNumber);
+            		bestChromosomes.put(currSubPop, currList);
+            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).score.floatValue();
+
+            		if (currChromosome.score > bestChromosome.score) {
+            			bestChromosome = currChromosome;
+            		}
             	}
                 line = br.readLine();
+                pos++;
             }
         } finally {
             br.close();
         }
 
-        return bestChromosomes.get(0);
+        return bestChromosome;
     }
 
     protected static ArrayList<double[]> createMap(int numCities) {

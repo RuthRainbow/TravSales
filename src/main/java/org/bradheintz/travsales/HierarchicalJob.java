@@ -5,6 +5,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -35,9 +38,9 @@ public class HierarchicalJob extends Configured implements Tool {
     private static int populationSize;
     private static int selectionBinSize;
     private static int numSubPopulations;
-    private static float lowerBound;
     private static int hierarchyLevel;
     private static boolean finalHierarchyLevel;
+    private static float[] lowerBounds;
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new HierarchicalJob(), args);
@@ -56,6 +59,7 @@ public class HierarchicalJob extends Configured implements Tool {
         populationSize = Integer.valueOf(args[2]);
         numSubPopulations = (int) Integer.valueOf(args[3]);
         selectionBinSize = (int) populationSize/numSubPopulations;
+        lowerBounds = new float[numSubPopulations];
         hierarchyLevel = Integer.valueOf(args[4]);
         finalHierarchyLevel = Boolean.valueOf(args[5]);
 
@@ -64,18 +68,22 @@ public class HierarchicalJob extends Configured implements Tool {
 	}
 
 	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
+		findMigrationBounds(generation);
+
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
         conf.setFloat("topTierToSave", topTierToSave);
         conf.setInt("selectionBinSize", selectionBinSize);
         conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);
-        conf.setFloat("lowerBound", lowerBound);
         conf.set("cities", roadmap);
         conf.setInt("migrationFrequency", migrationFrequency);
         conf.setInt("generation", generation);
         conf.setEnum("topology", topology);
         conf.setInt("populationSize", populationSize);
+        for (int i = 0; i < lowerBounds.length; i++) {
+        	conf.setFloat("lowerBound" + i, lowerBounds[i]);
+        }
 
         Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d_%d", generation, hierarchyLevel));
 
@@ -100,8 +108,6 @@ public class HierarchicalJob extends Configured implements Tool {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d INNER", generation));
             System.exit(1);
         }
-
-        findMigrationBounds(generation);
     }
 
 	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
@@ -131,35 +137,62 @@ public class HierarchicalJob extends Configured implements Tool {
         return configStringBuilder.toString();
     }
 
-	// TODO Is this just the same as from the job? Could just pass as an arg...
-	private static void findMigrationBounds(int generation) throws IOException {
-    	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
+	 // Finds the lower bound on migration for every sub-population
+    private static ScoredChromosome findMigrationBounds(int generation) throws IOException {
+    	String inputPath = popPath + String.format("/tmp_%d_%d/part-r-00000", generation, hierarchyLevel-1);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
-    	lowerBound = 0;
-    	ArrayList<ScoredChromosome> bestChromosomes = new ArrayList<ScoredChromosome>();
+    	ScoredChromosome bestChromosome = null;
+    	Map<Integer, List<ScoredChromosome>> bestChromosomes =
+    			new HashMap<Integer, List<ScoredChromosome>>();
+    	int pos = 0;
+    	int currSubPop = pos % numSubPopulations;
 
         try {
             String line = br.readLine();
 
             while (line != null) {
+            	currSubPop = pos % numSubPopulations;
             	String[] fields = line.split("\t");
             	double fitness = Double.valueOf(fields[1]);
-            	if (bestChromosomes.size() < migrationNumber) {
-            		bestChromosomes.add(new ScoredChromosome(line));
-            		if (fitness > lowerBound) {
-            			lowerBound = (float) fitness;
+
+            	if (!bestChromosomes.containsKey(currSubPop)) {
+            		bestChromosomes.put(currSubPop, new ArrayList<ScoredChromosome>());
+            	}
+            	if (bestChromosome == null) {
+            		bestChromosome = new ScoredChromosome(line);
+            	}
+
+            	if (bestChromosomes.get(currSubPop).size() < migrationNumber) {
+            		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
+            		ScoredChromosome currChromosome = new ScoredChromosome(line);
+            		currList.add(currChromosome);
+            		bestChromosomes.put(currSubPop, currList);
+            		lowerBounds[currSubPop] = (float) fitness;
+
+            		if (currChromosome.score > bestChromosome.score) {
+            			bestChromosome = currChromosome;
             		}
-            	} else if (fitness > lowerBound) {
-            		bestChromosomes.add(new ScoredChromosome(line));
-            		Collections.sort(bestChromosomes);
-            		bestChromosomes.remove(migrationNumber);
-            		lowerBound = bestChromosomes.get(migrationNumber-1).score.floatValue();
+            	} else if (fitness > lowerBounds[currSubPop]) {
+            		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
+            		ScoredChromosome currChromosome = new ScoredChromosome(line);
+            		currList.add(currChromosome);
+            		Collections.sort(currList);
+            		currList.remove(migrationNumber);
+            		bestChromosomes.put(currSubPop, currList);
+            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).score.floatValue();
+
+            		if (currChromosome.score > bestChromosome.score) {
+            			bestChromosome = currChromosome;
+            		}
             	}
                 line = br.readLine();
+                pos++;
             }
         } finally {
             br.close();
         }
+
+        return bestChromosome;
     }
 
 }

@@ -13,32 +13,32 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.bradheintz.travsales.TravSalesJob.Topology;
 
 /**
- * @author bradheintz
  *
- * The map class should work out a fitness value for each individual and write this as the value.
+ * This mapper handles migration between sub-populations
  */
 public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
     private VIntWritable outKey = new VIntWritable();
     private int numSubPopulations;
-    // The key is the subpop number, the value is the chromosome/score pair
+    private int keyValue;
+    // The key is the sub-pop number, the value is the chromosome/score pair
     @Override
     protected void map(LongWritable key, Text value, Context context)
     		throws IOException, InterruptedException {
     	ScoredChromosome sc = new ScoredChromosome(value);
+    	keyValue = Integer.valueOf(key.toString());
     	Topology topology = context.getConfiguration().getEnum("topology", Topology.RING);
-    	float lowerBound = context.getConfiguration().getFloat("lowerBound", Float.MAX_VALUE);
+    	float lowerBound = context.getConfiguration().getFloat("lowerBound" + keyValue, Float.MAX_VALUE);
     	numSubPopulations = context.getConfiguration().getInt("numSubPopulations", 1);
     	int migrationRate = context.getConfiguration().getInt("migrationRate", 1);
-    	int generation = context.getConfiguration().getInt("generation", 1);
-    	boolean isMigrate = generation%migrationRate == 0 ? true : false;
+    	boolean isMigrate = migrationRate == 0 ? true : false;
 
     	if (isMigrate && sc.score > lowerBound) {
     		switch (topology) {
-    			case RING: ringBroadcast(sc, key, value, context); break;
-    			case HYPERCUBE: hypercubeBroadcast(sc, key, value, context); break;
+    			case RING: ringBroadcast(sc, value, context); break;
+    			case HYPERCUBE: hypercubeBroadcast(sc, value, context); break;
     		}
     	}
-    	// Always send key to it's own reducer (don't remove individuals from subpopulations here)
+    	// Always send key to it's own reducer (don't remove individuals from sub-populations here)
     	outKey.set(Integer.valueOf(key.toString()));
         context.write(outKey, value);
     }
@@ -48,9 +48,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
         super.setup(context);
     }
 
-    private void ringBroadcast(ScoredChromosome sc, LongWritable key, Text value, Context context)
+    private void ringBroadcast(ScoredChromosome sc, Text value, Context context)
     		throws IOException, InterruptedException {
-    	int keyValue = Integer.valueOf(key.toString());
     	VIntWritable currOutKey = new VIntWritable();
 
     	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 10);
@@ -72,12 +71,11 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	context.write(currOutKey, value);
     }
 
-    private void hypercubeBroadcast(ScoredChromosome sc, LongWritable key, Text value,
+    private void hypercubeBroadcast(ScoredChromosome sc, Text value,
     		Context context) throws IOException, InterruptedException {
-    	int keyValue = Integer.valueOf(key.toString());
     	VIntWritable currOutKey = new VIntWritable();
 
-    	// The node index in the hypercube - start form 0
+    	// The node index in the hypercube - start from 0
     	int numBinaryDigits = (int) Math.ceil(Math.log(numSubPopulations)/Math.log(2));
     	String binaryString = Integer.toBinaryString(keyValue);
     	binaryString = addLeadingZeros(binaryString, numBinaryDigits);
