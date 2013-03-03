@@ -7,6 +7,7 @@ package org.bradheintz.travsales;
 import java.util.ArrayList;
 
 /**
+ * The class that assigns chromosomes a fitness value.
  *
  * @author bradheintz
  */
@@ -68,7 +69,7 @@ public class ChromosomeScorer {
 
         ArrayList<Integer> genes = new ArrayList<Integer>(geneStrings.length + 1);
         for (String geneString : geneStrings) {
-            genes.add(Integer.decode(geneString)); // LATER lots more logging and checking and shit here
+            genes.add(Integer.decode(geneString)); // LATER lots more logging and checking here
         }
         genes.add(0);
 

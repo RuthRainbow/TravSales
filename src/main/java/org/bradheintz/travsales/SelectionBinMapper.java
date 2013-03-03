@@ -13,30 +13,32 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.bradheintz.travsales.TravSalesJob.Topology;
 
 /**
- *
- * This mapper handles migration between sub-populations
+ * Sends values to reducers based on their sub-population index. Also handles migration between
+ * sub-populations based on the topology.
  */
 public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
     private VIntWritable outKey = new VIntWritable();
     private int numSubPopulations;
     private int keyValue;
+    private Text value;
     // The key is the sub-pop number, the value is the chromosome/score pair
     @Override
     protected void map(LongWritable key, Text value, Context context)
     		throws IOException, InterruptedException {
     	ScoredChromosome sc = new ScoredChromosome(value);
     	keyValue = Integer.valueOf(key.toString());
+    	this.value = value;
     	Topology topology = context.getConfiguration().getEnum("topology", Topology.RING);
     	float lowerBound = context.getConfiguration().getFloat("lowerBound" + keyValue, Float.MAX_VALUE);
     	numSubPopulations = context.getConfiguration().getInt("numSubPopulations", 1);
-    	int migrationRate = context.getConfiguration().getInt("migrationRate", 1);
+    	int migrationRate = context.getConfiguration().getInt("migrationFrequency", 1);
     	int generation = context.getConfiguration().getInt("generation", 1);
     	boolean isMigrate = generation%migrationRate == 0 ? true : false;
 
     	if (isMigrate && sc.score > lowerBound) {
     		switch (topology) {
-    			case RING: ringBroadcast(sc, value, context); break;
-    			case HYPERCUBE: hypercubeBroadcast(sc, value, context); break;
+    			case RING: ringBroadcast(sc, context); break;
+    			case HYPERCUBE: hypercubeBroadcast(sc, context); break;
     		}
     	}
     	// Always send key to it's own reducer (don't remove individuals from sub-populations here)
@@ -49,7 +51,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
         super.setup(context);
     }
 
-    private void ringBroadcast(ScoredChromosome sc, Text value, Context context)
+    private void ringBroadcast(ScoredChromosome sc, Context context)
     		throws IOException, InterruptedException {
     	VIntWritable currOutKey = new VIntWritable();
 
@@ -72,8 +74,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	context.write(currOutKey, value);
     }
 
-    private void hypercubeBroadcast(ScoredChromosome sc, Text value,
-    		Context context) throws IOException, InterruptedException {
+    private void hypercubeBroadcast(ScoredChromosome sc, Context context)
+    		throws IOException, InterruptedException {
     	VIntWritable currOutKey = new VIntWritable();
 
     	// The node index in the hypercube - start from 0

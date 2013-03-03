@@ -16,6 +16,15 @@ import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.log4j.Logger;
 
+/**
+ * Processes entire sub-populations in 5 steps:
+ * 1. Sort by fitness
+ * 2. Normalise fitness scores
+ * 3. Select survivors with a fitness above a threshold value
+ * 4. Create offspring from survivors by choosing parents at random then performing crossover with a
+ * chance of mutation (implementation handled by extending class)
+ * 5. Write survivors and offspring to file
+ */
 public abstract class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
 
 	private final static Logger log = Logger.getLogger(TopLevelReducer.class);
@@ -30,15 +39,12 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
-		//System.out.println("in inner reduce, the key is " + key);
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
 		normalizeScores(sortedChromosomes);
 
-		//System.out.println("sorted chrom size is " + sortedChromosomes.size());
 		int survivorsWanted = (int) Math.ceil(sortedChromosomes.size() * survivorProportion);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 
-		//System.out.println("survivors wanted " + survivorsWanted);
 		while (survivors.size() < survivorsWanted) {
 			survivors.add(selectSurvivor(sortedChromosomes));
 		}
@@ -46,7 +52,6 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 		// TODO just use survivors for newPopulation - why not? avoid dupes, save making another collection
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 
-		//System.out.println("desiredPopulationSize " + desiredPopulationSize);
 		while (survivors.size() < desiredPopulationSize) {
 			survivors.add(makeOffspring(parentPool));
 		}
@@ -117,7 +122,7 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 			}
 		}
 
-		return null; // LATER this is a horrible error condition, and I should do something about it
+		return null; // TODO LATER this is a horrible error condition, and I should do something about it
 	}
 
 	protected abstract ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException;

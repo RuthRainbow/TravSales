@@ -23,13 +23,16 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.bradheintz.travsales.TravSalesJob.Topology;
 
+/**
+ * The job that works for every hierarchy level except the innermost; called from TravSalesJob
+ *
+ */
 public class HierarchicalJob extends Configured implements Tool {
 
     private static final String popPath = "travsales_populations";
-    private static final float topTierToSave = 0.1f; // TODO
     private static final float survivorProportion = 0.3f;
     private static final float mutationChance = 0.01f;
-    private static final int migrationFrequency = 10; // Should change based on hierarchy level
+    private static final int migrationFrequency = 10; // TODO Should change based on hierarchy level
     private static final int migrationNumber = 3;
     private static final Topology topology = Topology.HYPERCUBE;
 
@@ -72,7 +75,6 @@ public class HierarchicalJob extends Configured implements Tool {
 
         Configuration conf = new Configuration();
         conf.setFloat("survivorProportion", survivorProportion);
-        conf.setFloat("topTierToSave", topTierToSave);
         conf.setInt("selectionBinSize", selectionBinSize);
         conf.setInt("numSubPopulations", numSubPopulations);
         conf.setFloat("mutationChance", mutationChance);

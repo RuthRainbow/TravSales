@@ -15,6 +15,9 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.util.LineReader;
 
+/**
+ * Extension of TextInputFormat to use position in file % number of sub-populations as key
+ */
 public class KeyValueFormat extends TextInputFormat{
     @Override
    public RecordReader<LongWritable, Text> createRecordReader(InputSplit split, TaskAttemptContext context) {

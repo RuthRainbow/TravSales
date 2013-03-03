@@ -4,6 +4,9 @@ import java.util.Arrays;
 
 import org.apache.hadoop.io.Text;
 
+/**
+ * Class to hold chromosome-score pair and handle mutation.
+ */
 public class ScoredChromosome implements Comparable<ScoredChromosome> {
 	String chromosome;
 	String[] chromosomeArray = null;

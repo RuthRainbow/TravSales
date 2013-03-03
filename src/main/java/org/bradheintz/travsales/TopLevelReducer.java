@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import org.apache.log4j.Logger;
 
 /**
+ * The reducer used by the innermost hierarchy level - performs crossover and mutation with no scoring.
  *
  * @author bradheintz
  */

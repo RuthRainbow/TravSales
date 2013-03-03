@@ -33,6 +33,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 /**
+ * The main job - forms the innermost hierarchy level and calls all other levels.
  *
  * @author bradheintz
  */
@@ -63,7 +64,6 @@ public class TravSalesJob extends Configured implements Tool {
     	HYPERCUBE, RING;
     }
 
-    // Not sure if char needs to be saved
     private enum Option {
     	NUMCITIES('c'),
     	POPULATIONSIZE('s'),
@@ -177,7 +177,8 @@ public class TravSalesJob extends Configured implements Tool {
         	FileOutputFormat.setOutputPath(job, new Path(popPath + String.format("/tmp_%d_1", generation)));
         }
 
-        System.out.println(String.format("Hierarchy level 1: Selecting from population %d, breeding and scoring population %d", generation, generation + 1));
+        System.out.println(String.format("Hierarchy level 1: Selecting from population %d, " +
+        		"breeding and scoring population %d", generation, generation + 1));
         if (!job.waitForCompletion(true)) {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
             System.exit(1);
@@ -191,7 +192,8 @@ public class TravSalesJob extends Configured implements Tool {
     }
 
     private static void runNextLevel(int generation) throws Exception {
-        // Args for new job: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level> <final hierarchy level?>
+        // Args for new job: <generation #> <# cities> <population size> <# subpopulations>
+    	// <hierarchy level> <final hierarchy level?>
         String[] args = new String[6];
         for (int i = 1; i < numHierarchyLevels; i++) {
         	args[0] = String.valueOf(generation);
@@ -417,7 +419,6 @@ public class TravSalesJob extends Configured implements Tool {
 
     protected static void createInitialPopulation(FSDataOutputStream populationOutfile,
     		final int populationSize, final int numCities) throws IOException {
-        // Could create good initial solution using what the paper was chatting about graphs least tree or something
     	for (int i = 0; i < populationSize; ++i) {
             for (int j = 0; j < (numCities - 1); ++j) {
                 if (j > 0) {
