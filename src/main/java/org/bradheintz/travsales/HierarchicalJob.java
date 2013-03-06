@@ -31,9 +31,6 @@ public class HierarchicalJob extends Configured implements Tool {
 
     private static final String popPath = "travsales_populations";
     private static final float survivorProportion = 0.3f;
-    private static final float mutationChance = 0.01f;
-    private static final int migrationFrequency = 10; // TODO Should change based on hierarchy level
-    private static final int migrationNumber = 3;
     private static final Topology topology = Topology.HYPERCUBE;
 
     private static int generation;
@@ -44,6 +41,9 @@ public class HierarchicalJob extends Configured implements Tool {
     private static int hierarchyLevel;
     private static boolean finalHierarchyLevel;
     private static float[] lowerBounds;
+    private static int migrationFrequency;
+    private static int migrationNumber;
+    private static float mutationChance;
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new HierarchicalJob(), args);
@@ -56,7 +56,8 @@ public class HierarchicalJob extends Configured implements Tool {
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
 
-        // Args: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level> <final hierarchy level?>
+        /* Args: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level>
+           <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance> */
         generation = Integer.valueOf(args[0]);
         numCities = Integer.valueOf(args[1]);
         populationSize = Integer.valueOf(args[2]);
@@ -65,6 +66,9 @@ public class HierarchicalJob extends Configured implements Tool {
         lowerBounds = new float[numSubPopulations];
         hierarchyLevel = Integer.valueOf(args[4]);
         finalHierarchyLevel = Boolean.valueOf(args[5]);
+        migrationFrequency = Integer.valueOf(args[6]);
+        migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[7]));
+        mutationChance = Float.valueOf(args[8]);
 
         selectAndReproduce(generation, roadmap);
 		return 0;

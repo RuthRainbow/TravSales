@@ -42,8 +42,6 @@ public class TravSalesJob extends Configured implements Tool {
     private static Random random = new Random();
 
     private static final float survivorProportion = 0.3f;
-    private static final int migrationFrequency = 3;
-    private static final int migrationNumber = 3;
     private static final Topology topology = Topology.RING;
     private static final int numCities = 20;
 
@@ -51,8 +49,11 @@ public class TravSalesJob extends Configured implements Tool {
     private static int selectionBinSize;
     private static int numSubPopulations;
     private static int maxGenerations = 500;
-    private static int numHierarchyLevels = 3;
+    private static int numHierarchyLevels = 2;
     private static float mutationChance = 0.01f;
+    private static int migrationFrequency = 3;
+    private static float migrationPercentage = 0.0003f;
+    private static int migrationNumber;
     private static String popPath = "travsales_populations";
 
     private static float[] lowerBounds;
@@ -69,6 +70,8 @@ public class TravSalesJob extends Configured implements Tool {
     	MAXNUMGENERATIONS('g', "maximum number of generations"),
     	NUMHIERARCHYLEVELS('h', "number of hierarchy levels"),
     	MUTATIONCHANCE('m', "mutation chance"),
+    	MIGRATIONRATE('r', "migration rate"),
+    	MIGRATIONPERCENTAGE('p', "migration percentage"),
     	FILEPATH('f', "filepath");
 
     	protected final char shortcut;
@@ -103,6 +106,7 @@ public class TravSalesJob extends Configured implements Tool {
     	numSubPopulations = (int) Math.pow(10, numHierarchyLevels);
     	selectionBinSize = (int) populationSize/numSubPopulations;
     	lowerBounds = new float[numSubPopulations];
+    	migrationNumber = (int) Math.floor(populationSize * migrationPercentage);
 
         FileSystem fs = FileSystem.get(conf);
         String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
@@ -198,9 +202,10 @@ public class TravSalesJob extends Configured implements Tool {
     }
 
     private static void runNextLevel(int generation) throws Exception {
-        // Args for new job: <generation #> <# cities> <population size> <# subpopulations>
-    	// <hierarchy level> <final hierarchy level?>
-        String[] args = new String[6];
+        /* Args for new job: <generation #> <# cities> <population size> <# subpopulations>
+    	   <hierarchy level> <final hierarchy level?> <migration frequency> <migration percentage>
+    	   <mutation chance> */
+        String[] args = new String[9];
         for (int i = 1; i < numHierarchyLevels; i++) {
         	args[0] = String.valueOf(generation);
         	args[1] = String.valueOf(numCities);
@@ -210,6 +215,9 @@ public class TravSalesJob extends Configured implements Tool {
         	args[4] = String.valueOf(i+1);
         	args[5] = (i + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
         	// TODO maybe this doesn't work well for many hierarchies - in parallel?
+        	args[6] = String.valueOf(migrationFrequency * i);
+        	args[7] = String.valueOf(migrationPercentage * i);
+        	args[8] = String.valueOf(mutationChance);
         	ToolRunner.run(new HierarchicalJob(), args);
         }
 	}
@@ -219,6 +227,9 @@ public class TravSalesJob extends Configured implements Tool {
     	float dec = -1;
     	String str = null;
     	for (int i = 0; i < args.length; i+=2) {
+    		dec = -1;
+    		num = -1;
+    		str = null;
     		Option chosenOption = null;
     		if (!args[0].startsWith("-")) {
     			System.out.println("Incorrect formatting - " +
@@ -253,6 +264,8 @@ public class TravSalesJob extends Configured implements Tool {
     			case MAXNUMGENERATIONS : maxGenerations = checkValid(num, chosenOption); break;
     			case NUMHIERARCHYLEVELS : numHierarchyLevels = checkValid(num, chosenOption); break;
     			case MUTATIONCHANCE : mutationChance = checkValid(dec, chosenOption); break;
+    			case MIGRATIONRATE: migrationFrequency = checkValid(num, chosenOption); break;
+    			case MIGRATIONPERCENTAGE: migrationPercentage = checkValid(dec, chosenOption); break;
     			case FILEPATH : popPath = checkValid(str, chosenOption); break;
     			default: break;
     		}
@@ -299,6 +312,8 @@ public class TravSalesJob extends Configured implements Tool {
 			case "g" : return Option.MAXNUMGENERATIONS;
 			case "h" : return Option.NUMHIERARCHYLEVELS;
 			case "m" : return Option.MUTATIONCHANCE;
+			case "r" : return Option.MIGRATIONRATE;
+			case "p" : return Option.MIGRATIONPERCENTAGE;
 			case "f" : return Option.FILEPATH;
 			default : return null;
 		}
