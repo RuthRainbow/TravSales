@@ -10,7 +10,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.VIntWritable;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.bradheintz.travsales.TravSalesJob.Topology;
+import org.bradheintz.travsales.InitialJob.Topology;
 
 /**
  * Sends values to reducers based on their sub-population index. Also handles migration between

@@ -21,7 +21,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
-import org.bradheintz.travsales.TravSalesJob.Topology;
+import org.bradheintz.travsales.InitialJob.Topology;
 
 /**
  * The job that works for every hierarchy level except the innermost; called from TravSalesJob
@@ -29,12 +29,11 @@ import org.bradheintz.travsales.TravSalesJob.Topology;
  */
 public class HierarchicalJob extends Configured implements Tool {
 
-    private static final String popPath = "travsales_populations";
     private static final float survivorProportion = 0.3f;
     private static final Topology topology = Topology.HYPERCUBE;
 
+    private static String popPath;
     private static int generation;
-    private static int numCities;
     private static int populationSize;
     private static int selectionBinSize;
     private static int numSubPopulations;
@@ -54,21 +53,21 @@ public class HierarchicalJob extends Configured implements Tool {
 		Configuration conf = new Configuration();
 
         FileSystem fs = FileSystem.get(conf);
-        String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf, numCities);
+        String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf);
 
-        /* Args: <generation #> <# cities> <population size> <# subpopulations> <hierarchy level>
+        /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
            <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance> */
         generation = Integer.valueOf(args[0]);
-        numCities = Integer.valueOf(args[1]);
-        populationSize = Integer.valueOf(args[2]);
-        numSubPopulations = (int) Integer.valueOf(args[3]);
+        populationSize = Integer.valueOf(args[1]);
+        numSubPopulations = (int) Integer.valueOf(args[2]);
         selectionBinSize = (int) populationSize/numSubPopulations;
         lowerBounds = new float[numSubPopulations];
-        hierarchyLevel = Integer.valueOf(args[4]);
-        finalHierarchyLevel = Boolean.valueOf(args[5]);
-        migrationFrequency = Integer.valueOf(args[6]);
-        migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[7]));
-        mutationChance = Float.valueOf(args[8]);
+        hierarchyLevel = Integer.valueOf(args[3]);
+        finalHierarchyLevel = Boolean.valueOf(args[4]);
+        migrationFrequency = Integer.valueOf(args[5]);
+        migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[6]));
+        mutationChance = Float.valueOf(args[7]);
+        popPath = args[8];
 
         selectAndReproduce(generation, roadmap);
 		return 0;
@@ -116,8 +115,8 @@ public class HierarchicalJob extends Configured implements Tool {
         }
     }
 
-	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
-    		final int numCitiesIgnored) throws IOException {
+	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig)
+			throws IOException {
         ArrayList<double[]> roadmap = new ArrayList<double[]>(20);
         for (int i = 0; i < 5; ++i) {
             double dummy = 0.2 * (double)i;
