@@ -35,7 +35,9 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	int generation = context.getConfiguration().getInt("generation", 1);
     	boolean isMigrate = generation%migrationRate == 0 ? true : false;
 
-    	if (isMigrate && sc.score > lowerBound) {
+    	double random = Math.random();
+
+    	if (isMigrate && (sc.score > lowerBound || random == 0.0001)) {
     		switch (topology) {
     			case RING: ringBroadcast(sc, context); break;
     			case HYPERCUBE: hypercubeBroadcast(sc, context); break;
