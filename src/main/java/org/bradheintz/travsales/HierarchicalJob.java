@@ -11,8 +11,6 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.VIntWritable;
@@ -20,43 +18,39 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
-import org.apache.hadoop.util.ToolRunner;
 import org.bradheintz.travsales.InitialJob.Topology;
 
 /**
- * The job that works for every hierarchy level except the innermost; called from TravSalesJob
+ * The base hierarchical job - can be implemented with the algorithm specifics or run as is
  *
+ * @author ruthking
  */
 public class HierarchicalJob extends Configured implements Tool {
+	private Configuration config;
 
     private static final float survivorProportion = 0.3f;
     private static final Topology topology = Topology.HYPERCUBE;
+    protected static String problem;
 
-    private static String popPath;
-    private static int generation;
-    private static int populationSize;
-    private static int selectionBinSize;
-    private static int numSubPopulations;
-    private static int hierarchyLevel;
-    private static boolean finalHierarchyLevel;
-    private static float[] lowerBounds;
-    private static int migrationFrequency;
-    private static int migrationNumber;
-    private static float mutationChance;
+    protected static String popPath;
+    protected static int generation;
+    protected static int populationSize;
+    protected static int selectionBinSize;
+    protected static int numSubPopulations;
+    protected static int hierarchyLevel;
+    protected static boolean finalHierarchyLevel;
+    protected static float[] lowerBounds;
+    protected static int migrationFrequency;
+    protected static int migrationNumber;
+    protected static float mutationChance;
 
-    public static void main(String[] args) throws Exception {
-        ToolRunner.run(new HierarchicalJob(), args);
-    }
-
-	@Override
+    @Override
 	public int run(String[] args) throws Exception {
-		Configuration conf = new Configuration();
-
-        FileSystem fs = FileSystem.get(conf);
-        String roadmap = createTrivialRoadmap(fs.create(new Path("_CITY_MAP")), conf);
+		config = new Configuration();
 
         /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
-           <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance> */
+           <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
+           <population filepath> <problem string> */
         generation = Integer.valueOf(args[0]);
         populationSize = Integer.valueOf(args[1]);
         numSubPopulations = (int) Integer.valueOf(args[2]);
@@ -68,37 +62,17 @@ public class HierarchicalJob extends Configured implements Tool {
         migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[6]));
         mutationChance = Float.valueOf(args[7]);
         popPath = args[8];
+        problem = args[9];
 
-        selectAndReproduce(generation, roadmap);
+        selectAndReproduce(generation, problem);
 		return 0;
 	}
 
-	protected static void selectAndReproduce(int generation, String roadmap) throws Exception {
-		findMigrationBounds(generation);
+    protected void selectAndReproduce(int generation, String roadmap) throws Exception {
+    	findMigrationBounds(generation);
 
-        Configuration conf = new Configuration();
-        conf.setFloat("survivorProportion", survivorProportion);
-        conf.setInt("selectionBinSize", selectionBinSize);
-        conf.setInt("numSubPopulations", numSubPopulations);
-        conf.setFloat("mutationChance", mutationChance);
-        conf.set("cities", roadmap);
-        conf.setInt("migrationFrequency", migrationFrequency);
-        conf.setInt("generation", generation);
-        conf.setEnum("topology", topology);
-        conf.setInt("populationSize", populationSize);
-        for (int i = 0; i < lowerBounds.length; i++) {
-        	conf.setFloat("lowerBound" + i, lowerBounds[i]);
-        }
-
-        Job job = new Job(conf, String.format("inner_travsales_select_and_reproduce_%d_%d", generation, hierarchyLevel));
-
-        job.setInputFormatClass(KeyValueFormat.class);
-        job.setOutputKeyClass(VIntWritable.class);
-        job.setOutputValueClass(Text.class);
-
-        job.setJarByClass(HierarchicalJob.class);
-        job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(HierarchicalReducer.class);
+    	config = setConfigValues(config);
+    	Job job = setUpHierarchicalJob(generation);
 
         FileInputFormat.setInputPaths(job, new Path(popPath + String.format("/tmp_%d_%d", generation, hierarchyLevel-1)));
         if (finalHierarchyLevel == true) {
@@ -109,40 +83,45 @@ public class HierarchicalJob extends Configured implements Tool {
 
         System.out.println(String.format("Hierarchy level %d: Selecting from population %d, " +
         		"breeding and scoring population %d", hierarchyLevel, generation, generation + 1));
+
         if (!job.waitForCompletion(true)) {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d INNER", generation));
             System.exit(1);
         }
     }
 
-	protected static String createTrivialRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig)
-			throws IOException {
-        ArrayList<double[]> roadmap = new ArrayList<double[]>(20);
-        for (int i = 0; i < 5; ++i) {
-            double dummy = 0.2 * (double)i;
-            roadmap.add(new double[] {0.0, dummy});
-            roadmap.add(new double[] {dummy, 1.0});
-            roadmap.add(new double[] {dummy + 0.2, 0.0});
-            roadmap.add(new double[] {1.0, dummy + 0.2});
+    protected Configuration setConfigValues(Configuration conf) {
+        conf.setFloat("survivorProportion", survivorProportion);
+        conf.setInt("selectionBinSize", selectionBinSize);
+        conf.setInt("numSubPopulations", numSubPopulations);
+        conf.setFloat("mutationChance", mutationChance);
+        conf.set("problem", problem);
+        conf.setInt("migrationFrequency", migrationFrequency);
+        conf.setInt("generation", generation);
+        conf.setEnum("topology", topology);
+        conf.setInt("populationSize", populationSize);
+        for (int i = 0; i < lowerBounds.length; i++) {
+        	conf.setFloat("lowerBound" + i, lowerBounds[i]);
         }
-
-        StringBuilder configStringBuilder = new StringBuilder("");
-        for (int i = 0; i < roadmap.size(); ++i) {
-            double[] coords = roadmap.get(i);
-            hdfsOut.writeBytes(String.format("%d %g %g\n", i, coords[0], coords[1]));
-
-            if (configStringBuilder.length() > 0) {
-                configStringBuilder.append(";");
-            }
-            configStringBuilder.append(String.format("%g,%g", coords[0], coords[1]));
-        }
-        hdfsOut.close();
-        hdfsOut = null;
-
-        return configStringBuilder.toString();
+        return conf;
     }
 
-	 // Finds the lower bound on migration for every sub-population
+    protected Job setUpHierarchicalJob(int generation) throws IOException {
+    	Job job = new Job(config, String.format("inner_hierarchical_select_and_reproduce_%d_%d",
+    			generation, hierarchyLevel));
+
+        job.setInputFormatClass(KeyValueFormat.class);
+        job.setOutputKeyClass(VIntWritable.class);
+        job.setOutputValueClass(Text.class);
+
+        job.setJarByClass(TravSalesHierarchicalJob.class);
+        job.setMapperClass(SelectionBinMapper.class);
+        job.setReducerClass(HierarchicalReducer.class);
+
+        return job;
+    }
+
+    // Finds the lower bound on migration for every sub-population
     private static ScoredChromosome findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/tmp_%d_%d/part-r-00000", generation, hierarchyLevel-1);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
@@ -199,5 +178,4 @@ public class HierarchicalJob extends Configured implements Tool {
 
         return bestChromosome;
     }
-
 }

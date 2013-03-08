@@ -44,8 +44,14 @@ public class TravSalesJob extends InitialJob implements Tool {
     @Override
     protected Configuration setInitialConfigValues(Configuration conf) {
     	conf.set("cities", problem);
-    	return conf;
+    	return super.setInitialConfigValues(conf);
     }
+
+    @Override
+    protected String setPopPath() {
+    	return popPath;
+    }
+
 
     @Override
     protected Job setUpInitialJob() throws IOException {
@@ -66,9 +72,8 @@ public class TravSalesJob extends InitialJob implements Tool {
     // For TravSales the problem is the city map
     @Override
     protected Configuration setIterativeConfigValues(Configuration conf, int generation) {
-    	super.setIterativeConfigValues(conf, generation);
     	conf.set("cities", problem);
-    	return conf;
+    	return super.setIterativeConfigValues(conf, generation);
     }
 
     protected static ArrayList<double[]> createMap(int numCities) {

@@ -104,6 +104,8 @@ public abstract class InitialJob extends Configured implements Tool{
         problem = setUpInitialProblem(fs.create(new Path("_CITY_MAP")), initialConfig);
         initialConfig = setInitialConfigValues(initialConfig);
 
+        popPath = setPopPath();
+
         System.out.println("city map created...");
     	createInitialPopulation(fs.create(new Path(popPath + "/population_0/population_0_init")), populationSize);
         System.out.println("initial population created...");
@@ -128,7 +130,11 @@ public abstract class InitialJob extends Configured implements Tool{
     	return 0;
     }
 
-    protected Configuration setInitialConfigValues(Configuration conf) {
+    protected String setPopPath() {
+		return popPath;
+	}
+
+	protected Configuration setInitialConfigValues(Configuration conf) {
     	conf.set("problem", problem);
     	return conf;
     }
@@ -230,11 +236,14 @@ public abstract class InitialJob extends Configured implements Tool{
     }
 
     protected void runHierarchicalJob(String[] args) throws Exception {
-    	ToolRunner.run(new HierarchicalJob(), args);
+    	ToolRunner.run(new TravSalesHierarchicalJob(), args);
     }
 
+    /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
+       <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
+       <population filepath> <problem string> */
     protected String[] fillArgs(int generation, int level) {
-    	String[] args = new String[9];
+    	String[] args = new String[10];
     	args[0] = String.valueOf(generation);
      	args[1] = String.valueOf(populationSize);
      	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels-level));
@@ -246,6 +255,7 @@ public abstract class InitialJob extends Configured implements Tool{
      	args[6] = String.valueOf(migrationPercentage * level);
      	args[7] = String.valueOf(mutationChance);
      	args[8] = popPath;
+     	args[9] = problem;
      	return args;
     }
 
