@@ -13,7 +13,7 @@ import java.util.ArrayList;
  */
 public class ChromosomeScorer {
 
-    protected ArrayList<double[]> cities;
+    public ArrayList<double[]> cities;
     protected ArrayList<Boolean> citiesUsed;
     final static double SQRT2 = Math.sqrt(2.0);
     protected double maxDistance;

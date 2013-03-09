@@ -8,17 +8,17 @@ import org.apache.hadoop.io.Text;
  * Class to hold chromosome-score pair and handle mutation.
  */
 public class ScoredChromosome implements Comparable<ScoredChromosome> {
-	String chromosome;
+	private String chromosome;
 	String[] chromosomeArray = null;
-	Double score;
-	double accumulatedNormalizedScore = -1.0;
+	private Double score;
+	private double accumulatedNormalizedScore = -1.0;
 
-	ScoredChromosome() {
-		chromosome = "";
-		score = -1.0;
+	public ScoredChromosome() {
+		setChromosome("");
+		setScore(-1.0);
 	}
 
-	ScoredChromosome(Text testText) {
+	public ScoredChromosome(Text testText) {
 		String[] fields = testText.toString().split("\t");
 		createNewChromosome(fields);
 	}
@@ -29,9 +29,9 @@ public class ScoredChromosome implements Comparable<ScoredChromosome> {
 	}
 
 	private void createNewChromosome(String[] fields) {
-		chromosome = fields[0];
+		setChromosome(fields[0]);
 		try {
-			score = Double.parseDouble(fields[1]);
+			setScore(Double.parseDouble(fields[1]));
 		} catch (ArrayIndexOutOfBoundsException e) {
 			System.out.println("fields became " + Arrays.toString(fields));
 			e.printStackTrace();
@@ -39,14 +39,14 @@ public class ScoredChromosome implements Comparable<ScoredChromosome> {
 		}
 	}
 
-	String[] getChromosomeArray() {
+	public String[] getChromosomeArray() {
 		if (chromosomeArray == null) {
-			chromosomeArray = chromosome.split(" ");
+			chromosomeArray = getChromosome().split(" ");
 		}
 		return chromosomeArray;
 	}
 
-	void setGene(int geneToSet, int newValue) {
+	public void setGene(int geneToSet, int newValue) {
 		// TODO boundary checks
 		getChromosomeArray()[geneToSet] = Integer.toString(newValue);
 		StringBuilder newChromosome = new StringBuilder();
@@ -54,22 +54,46 @@ public class ScoredChromosome implements Comparable<ScoredChromosome> {
 			newChromosome.append(getChromosomeArray()[j]);
 			newChromosome.append(" ");
 		}
-		chromosome = newChromosome.toString().trim();
+		setChromosome(newChromosome.toString().trim());
 	}
 
 	@Override
 	public String toString() {
-		return this.chromosome + " Score: " + this.score;
+		return this.getChromosome() + " Score: " + this.getScore();
 	}
 
 	@Override
 	public int compareTo(ScoredChromosome sc) {
-		if (this.score == sc.score) {
+		if (this.getScore() == sc.getScore()) {
 			return 0;
-		} else if (this.score > sc.score) {
+		} else if (this.getScore() > sc.getScore()) {
 			return -1;
 		} else {
 			return 1;
 		}
+	}
+
+	public String getChromosome() {
+		return chromosome;
+	}
+
+	public void setChromosome(String chromosome) {
+		this.chromosome = chromosome;
+	}
+
+	public Double getScore() {
+		return score;
+	}
+
+	public void setScore(Double score) {
+		this.score = score;
+	}
+
+	public double getAccumulatedNormalizedScore() {
+		return accumulatedNormalizedScore;
+	}
+
+	public void setAccumulatedNormalizedScore(double accumulatedNormalizedScore) {
+		this.accumulatedNormalizedScore = accumulatedNormalizedScore;
 	}
 }

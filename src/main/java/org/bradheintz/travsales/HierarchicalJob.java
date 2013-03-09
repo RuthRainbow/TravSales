@@ -110,7 +110,8 @@ public class HierarchicalJob extends Configured implements Tool {
         	conf.setFloat("lowerBound" + i, lowerBounds[i]);
         }
         conf.setInt("noImprovementCount", noImprovementCount);
-
+        conf.setInt("hierarchyLevel", hierarchyLevel);
+        conf.setBoolean("finalHierarchyLevel", finalHierarchyLevel);
         return conf;
     }
 
@@ -124,7 +125,7 @@ public class HierarchicalJob extends Configured implements Tool {
 
         job.setJarByClass(TravSalesHierarchicalJob.class);
         job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(HierarchicalReducer.class);
+        job.setReducerClass(SelectionReproductionReducer.class);
 
         return job;
     }
@@ -161,7 +162,7 @@ public class HierarchicalJob extends Configured implements Tool {
             		bestChromosomes.put(currSubPop, currList);
             		lowerBounds[currSubPop] = (float) fitness;
 
-            		if (currChromosome.score > bestChromosome.score) {
+            		if (currChromosome.getScore() > bestChromosome.getScore()) {
             			bestChromosome = currChromosome;
             		}
             	} else if (fitness > lowerBounds[currSubPop]) {
@@ -171,9 +172,9 @@ public class HierarchicalJob extends Configured implements Tool {
             		Collections.sort(currList);
             		currList.remove(migrationNumber);
             		bestChromosomes.put(currSubPop, currList);
-            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).score.floatValue();
+            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).getScore().floatValue();
 
-            		if (currChromosome.score > bestChromosome.score) {
+            		if (currChromosome.getScore() > bestChromosome.getScore()) {
             			bestChromosome = currChromosome;
             		}
             	}

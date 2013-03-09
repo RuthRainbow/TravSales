@@ -25,9 +25,9 @@ import org.apache.log4j.Logger;
  * chance of mutation (implementation handled by extending class)
  * 5. Write survivors and offspring to file
  */
-public abstract class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
+public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
 
-	private final static Logger log = Logger.getLogger(TopLevelReducer.class);
+	private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
 	private double survivorProportion;
 	private int desiredPopulationSize;
 	protected double sideEffectSum = 0.0;
@@ -45,21 +45,19 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 
 		int survivorsWanted = (int) Math.ceil(sortedChromosomes.size() * survivorProportion);
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
-
 		while (survivors.size() < survivorsWanted) {
 			survivors.add(selectSurvivor(sortedChromosomes));
 		}
 
 		// TODO just use survivors for newPopulation - why not? avoid dupes, save making another collection
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
-
 		while (survivors.size() < desiredPopulationSize) {
 			survivors.add(makeOffspring(parentPool));
 		}
 
 		for (ScoredChromosome sc : survivors) {
-			outKey.set(sc.chromosome);
-			outValue.set(sc.score);
+			outKey.set(sc.getChromosome());
+			outValue.set(sc.getScore());
 			context.write(outKey, outValue);
 		}
 	}
@@ -90,19 +88,22 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 		TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
 			@Override
 			public int compare(ScoredChromosome c1, ScoredChromosome c2) {
-				return c1.score.compareTo(c2.score);
+				return c1.getScore().compareTo(c2.getScore());
 			}
 		});
 
 		sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
 		Iterator<Text> iter = scoredChromosomeStrings.iterator();
 
+		int count = 0;
 		while (iter.hasNext()) {
+			count++;
 			Text chromosomeToParse = iter.next();
 			ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
-			if (sortedChromosomes.add(sc)) sideEffectSum += sc.score;
-			log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, sideEffectSum));
+			if (sortedChromosomes.add(sc)) sideEffectSum += sc.getScore();
+			log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore(), sideEffectSum));
 		}
+		System.out.println(" OK THE NUMBER OF VALUES WAS " + count);
 
 		return sortedChromosomes;
 	}
@@ -112,9 +113,9 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 		double accumulatedScore = 0.0;
 		while (iter.hasNext()) {
 			ScoredChromosome sc = iter.next();
-			accumulatedScore += sc.score / sideEffectSum;
-			sc.accumulatedNormalizedScore = accumulatedScore;
-			log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore));
+			accumulatedScore += sc.getScore() / sideEffectSum;
+			sc.setAccumulatedNormalizedScore(accumulatedScore);
+			log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore()));
 		}
 	}
 
@@ -123,8 +124,8 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 		Iterator<ScoredChromosome> iter = scoredAndNormalizedChromosomes.iterator();
 		while (iter.hasNext()) {
 			ScoredChromosome sc = iter.next();
-			if (sc.accumulatedNormalizedScore > thresholdScore) {
-				log.debug(String.format("SELECTING: chromosome: %s, score: %g, accnormscore: %g, threshold: %g", sc.chromosome, sc.score, sc.accumulatedNormalizedScore, thresholdScore));
+			if (sc.getAccumulatedNormalizedScore() > thresholdScore) {
+				log.debug(String.format("SELECTING: chromosome: %s, score: %g, accnormscore: %g, threshold: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore(), thresholdScore));
 				return sc;
 			}
 		}
@@ -132,14 +133,48 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 		return null; // TODO LATER this is a horrible error condition, and I should do something about it
 	}
 
-	protected abstract ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException;
+	protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException {
+		int parent1Index = random.nextInt(parentPool.size());
+		int parent2Index = parent1Index;
+		while (parent2Index == parent1Index) {
+			parent2Index = random.nextInt(parentPool.size());
+		}
+
+		try {
+			ScoredChromosome parent1 = parentPool.get(parent1Index);
+			ScoredChromosome parent2 = parentPool.get(parent2Index);
+			log.debug(String.format("PARENT 1: chromosome: %s, score: %g, accnormscore: %g",
+					parent1.getChromosome(), parent1.getScore(), parent1.getAccumulatedNormalizedScore()));
+			log.debug(String.format("PARENT 2: chromosome: %s, score: %g, accnormscore: %g",
+					parent2.getChromosome(), parent2.getScore(), parent2.getAccumulatedNormalizedScore()));
+
+			ScoredChromosome offspring = crossover(parent1, parent2);
+			if (random.nextDouble() < mutationChance) {
+				mutate(offspring);
+			}
+
+			int hierarchyLevel = config.getInt("hierarchyLevel", 0);
+			if (hierarchyLevel != 0 || config.getBoolean("finalHierarchyLevel", true)) {
+				offspring.setScore(scorer.score(offspring.getChromosome()));
+			}
+
+			return offspring;
+		} catch (NullPointerException npe) {
+			log.error("*** NullPointerException in makeOffspring()");
+			log.error(String.format("parent 1 index: %d parent 2 index: %d pool size: %d",
+					parent1Index, parent2Index, parentPool.size()));
+			if (parentPool.get(parent1Index) == null) log.error("parent 1 null!");
+			if (parentPool.get(parent2Index) == null) log.error("parent 2 null!");
+			throw new InterruptedException("null pointer exception in makeOffspring()");
+		}
+	}
 
 	protected ScoredChromosome crossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		ScoredChromosome offspring = new ScoredChromosome();
 
 		// Random offspring generation to avoid premature convergence if parents equivalent
-		if (parent2.chromosome == parent1.chromosome) {
-			offspring.chromosome = randomlyGenerateChromosome();
+		if (parent2.getChromosome() == parent1.getChromosome()) {
+			offspring.setChromosome(randomlyGenerateChromosome());
 		} else {
 
 			int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
@@ -152,7 +187,7 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 				newChromosome.append(parent2.getChromosomeArray()[j]);
 				newChromosome.append(" ");
 			}
-			offspring.chromosome = newChromosome.toString().trim();
+			offspring.setChromosome(newChromosome.toString().trim());
 		}
 
 		return offspring;

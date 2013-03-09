@@ -42,12 +42,13 @@ public abstract class InitialJob extends Configured implements Tool{
 
     private static final float survivorProportion = 0.3f;
     private static final Topology topology = Topology.RING;
+    private static final int hierarchyLevel = 0;
 
     protected static int populationSize = 10000;
     protected static int selectionBinSize;
     protected static int numSubPopulations;
     protected static int maxGenerations = 500;
-    protected static int numHierarchyLevels = 2;
+    protected static int numHierarchyLevels = 1;
     protected static float mutationChance = 0.01f;
     protected static int migrationFrequency = 3;
     protected static float migrationPercentage = 0.0003f;
@@ -61,7 +62,7 @@ public abstract class InitialJob extends Configured implements Tool{
     protected ScoredChromosome currWorstChromosome;
     protected double currMeanFitness;
 
-    protected enum Topology {
+    public enum Topology {
     	HYPERCUBE, RING;
     }
 
@@ -148,8 +149,8 @@ public abstract class InitialJob extends Configured implements Tool{
             selectAndReproduce(generation, problem);
             ScoredChromosome bestChromosome = findMigrationBounds(generation);
             printBestIndividual(generation, bestChromosome);
-            if (bestChromosome.score > bestScoreCurrGen) {
-            	bestScoreCurrGen = bestChromosome.score;
+            if (bestChromosome.getScore() > bestScoreCurrGen) {
+            	bestScoreCurrGen = bestChromosome.getScore();
             	noImprovementCount = 0;
             	overallBestChromosome = bestChromosome;
             } else {
@@ -208,8 +209,8 @@ public abstract class InitialJob extends Configured implements Tool{
         	FileOutputFormat.setOutputPath(iterativeJob, new Path(popPath + String.format("/tmp_%d_1", generation)));
         }
 
-        System.out.println(String.format("Hierarchy level 1: Selecting from population %d, " +
-        		"breeding and scoring population %d", generation, generation + 1));
+        System.out.println(String.format("Hierarchy level %d: Selecting from population %d, " +
+        		"breeding and scoring population %d", hierarchyLevel, generation, generation + 1));
         if (!iterativeJob.waitForCompletion(true)) {
             System.out.println(String.format("FAILURE selecting & reproducing generation %d", generation));
             System.exit(1);
@@ -236,6 +237,8 @@ public abstract class InitialJob extends Configured implements Tool{
         	conf.setFloat("lowerBound" + i, lowerBounds[i]);
         }
         conf.setInt("noImprovementCount", noImprovementCount);
+        conf.setInt("hierarchyLevel", hierarchyLevel);
+        conf.setBoolean("finalHierarchyLevel", hierarchyLevel + 1 == numHierarchyLevels);
         return conf;
     }
 
@@ -248,7 +251,7 @@ public abstract class InitialJob extends Configured implements Tool{
 
         job.setJarByClass(TravSalesJob.class);
         job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(TopLevelReducer.class);
+        job.setReducerClass(SelectionReproductionReducer.class);
 
         return job;
     }
@@ -271,9 +274,9 @@ public abstract class InitialJob extends Configured implements Tool{
     	String[] args = new String[11];
     	args[0] = String.valueOf(generation);
      	args[1] = String.valueOf(populationSize);
-     	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels-level));
+     	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels - level));
+     	args[3] = String.valueOf(level);
      	// hierarchy indexes start from 0
-     	args[3] = String.valueOf(level+1);
      	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
      	// TODO maybe this doesn't work well for many hierarchies - in parallel?
      	args[5] = String.valueOf(migrationFrequency * level * 3);
@@ -425,7 +428,7 @@ public abstract class InitialJob extends Configured implements Tool{
             while (line != null) {
             	currSubPop = pos % numSubPopulations;
             	ScoredChromosome currChromosome = new ScoredChromosome(line);
-            	double fitness = currChromosome.score;
+            	double fitness = currChromosome.getScore();
 
             	if (!bestChromosomes.containsKey(currSubPop)) {
             		bestChromosomes.put(currSubPop, new ArrayList<ScoredChromosome>());
@@ -440,7 +443,7 @@ public abstract class InitialJob extends Configured implements Tool{
             		bestChromosomes.put(currSubPop, currList);
             		lowerBounds[currSubPop] = (float) fitness;
 
-            		if (currChromosome.score > bestChromosome.score) {
+            		if (currChromosome.getScore() > bestChromosome.getScore()) {
             			bestChromosome = currChromosome;
             		}
             	} else if (fitness > lowerBounds[currSubPop]) {
@@ -449,9 +452,9 @@ public abstract class InitialJob extends Configured implements Tool{
             		Collections.sort(currList);
             		currList.remove(migrationNumber);
             		bestChromosomes.put(currSubPop, currList);
-            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).score.floatValue();
+            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).getScore().floatValue();
 
-            		if (currChromosome.score > bestChromosome.score) {
+            		if (currChromosome.getScore() > bestChromosome.getScore()) {
             			bestChromosome = currChromosome;
             		}
             	}

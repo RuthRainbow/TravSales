@@ -39,16 +39,16 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	double random = Math.random();
     	double randomThreshold = 1/selectionBinSize;
 
-    	if (isMigrate && (sc.score > lowerBound || random <= randomThreshold)) {
+    	if (isMigrate && (sc.getScore() > lowerBound || random <= randomThreshold)) {
     		switch (topology) {
     			case RING: ringBroadcast(sc, context); break;
     			case HYPERCUBE: hypercubeBroadcast(sc, context); break;
     		}
-    	} else {
+    	} //else {
     		// Only send individual to current subpop if it hasn't migrated
     		outKey.set(Integer.valueOf(key.toString()));
     		context.write(outKey, value);
-    	}
+    	//}
     }
 
     @Override
@@ -60,11 +60,11 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     		throws IOException, InterruptedException {
     	VIntWritable currOutKey = new VIntWritable();
 
-    	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 10);
+    	int numSubPops = context.getConfiguration().getInt("numSubPopulations", 10);
 
     	// Migrate to the left sub-population
-    	if (keyValue % selectionBinSize == 0) {
-    		currOutKey.set(keyValue + selectionBinSize - 1);
+    	if (keyValue % numSubPops == 0) {
+    		currOutKey.set(keyValue + numSubPops - 1);
     	} else {
     		currOutKey.set(keyValue - 1);
     	}
@@ -72,8 +72,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
 
     	// TODO migrate only to one subpop?
     	// Migrate to the right sub-population
-    	if ((keyValue + 1) % selectionBinSize == 0) {
-    		currOutKey.set(keyValue - selectionBinSize - 1);
+    	if ((keyValue + 1) % numSubPops == 0) {
+    		currOutKey.set(keyValue - numSubPops + 1);
     	} else {
     		currOutKey.set(keyValue + 1);
     	}
