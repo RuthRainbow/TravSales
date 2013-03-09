@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -57,6 +58,8 @@ public abstract class InitialJob extends Configured implements Tool{
     protected double bestScoreCurrGen;
     protected int noImprovementCount;
     protected ScoredChromosome overallBestChromosome;
+    protected ScoredChromosome currWorstChromosome;
+    protected double currMeanFitness;
 
     protected enum Topology {
     	HYPERCUBE, RING;
@@ -164,6 +167,19 @@ public abstract class InitialJob extends Configured implements Tool{
     	}
     }
 
+    private void appendCurrentResults(ScoredChromosome bestChromosome, int generation) {
+    	try {
+    	    PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(popPath + "/result", true)));
+    	    out.println(generation + ") BEST: " + bestChromosome + " WORST: " + currWorstChromosome
+    	    		+ " AVERAGE FITNESS: " + currMeanFitness);
+    	    out.close();
+    	} catch (IOException e) {
+    		System.out.println("Failure writing this generation's overview to file");
+    	    e.printStackTrace();
+    	    System.exit(1);
+    	}
+    }
+
 	protected abstract String setUpInitialProblem(FSDataOutputStream fsDataOutputStream, Configuration conf)
 			throws IOException;
 
@@ -260,8 +276,8 @@ public abstract class InitialJob extends Configured implements Tool{
      	args[3] = String.valueOf(level+1);
      	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
      	// TODO maybe this doesn't work well for many hierarchies - in parallel?
-     	args[5] = String.valueOf(migrationFrequency * level);
-     	args[6] = String.valueOf(migrationPercentage * level);
+     	args[5] = String.valueOf(migrationFrequency * level * 3);
+     	args[6] = String.valueOf(migrationPercentage);
      	args[7] = String.valueOf(mutationChance);
      	args[8] = popPath;
      	args[9] = problem;
@@ -368,12 +384,13 @@ public abstract class InitialJob extends Configured implements Tool{
 
 	protected void printBestIndividual(int generation, ScoredChromosome bestChromosome) throws IOException {
         System.out.println("BEST INDIVIDUAL OF GENERATION " + generation + " IS " + bestChromosome);
-    }
+        appendCurrentResults(bestChromosome, generation);
+	}
 
     protected void writeResultToFile() {
     	try {
 			String content = overallBestChromosome.toString();
-			File file = new File(popPath + "/result");
+			File file = new File(popPath + "/finalresult");
 
 			// if file doesnt exists, then create it
 			if (!file.exists()) {
@@ -399,15 +416,17 @@ public abstract class InitialJob extends Configured implements Tool{
     			new HashMap<Integer, List<ScoredChromosome>>();
     	int pos = 0;
     	int currSubPop = pos % numSubPopulations;
+    	currMeanFitness = 0;
+    	double currWorstScore = Double.MAX_VALUE;
 
         try {
             String line = br.readLine();
 
             while (line != null) {
             	currSubPop = pos % numSubPopulations;
+            	ScoredChromosome currChromosome = new ScoredChromosome(line);
+            	double fitness = currChromosome.score;
 
-            	String[] fields = line.split("\t");
-            	double fitness = Double.valueOf(fields[1]);
             	if (!bestChromosomes.containsKey(currSubPop)) {
             		bestChromosomes.put(currSubPop, new ArrayList<ScoredChromosome>());
             	}
@@ -417,7 +436,6 @@ public abstract class InitialJob extends Configured implements Tool{
 
             	if (bestChromosomes.get(currSubPop).size() < migrationNumber) {
             		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
-            		ScoredChromosome currChromosome = new ScoredChromosome(line);
             		currList.add(currChromosome);
             		bestChromosomes.put(currSubPop, currList);
             		lowerBounds[currSubPop] = (float) fitness;
@@ -427,7 +445,6 @@ public abstract class InitialJob extends Configured implements Tool{
             		}
             	} else if (fitness > lowerBounds[currSubPop]) {
             		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
-            		ScoredChromosome currChromosome = new ScoredChromosome(line);
             		currList.add(currChromosome);
             		Collections.sort(currList);
             		currList.remove(migrationNumber);
@@ -438,12 +455,20 @@ public abstract class InitialJob extends Configured implements Tool{
             			bestChromosome = currChromosome;
             		}
             	}
+
+            	if (fitness < currWorstScore) {
+            		currWorstScore = fitness;
+            		currWorstChromosome = currChromosome;
+            	}
+            	currMeanFitness += fitness;
                 line = br.readLine();
                 pos++;
             }
         } finally {
             br.close();
         }
+
+        currMeanFitness /= populationSize;
 
         return bestChromosome;
     }

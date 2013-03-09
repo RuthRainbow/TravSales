@@ -109,6 +109,7 @@ public class HierarchicalJob extends Configured implements Tool {
         for (int i = 0; i < lowerBounds.length; i++) {
         	conf.setFloat("lowerBound" + i, lowerBounds[i]);
         }
+        conf.setInt("noImprovementCount", noImprovementCount);
 
         return conf;
     }
