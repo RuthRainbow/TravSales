@@ -43,6 +43,7 @@ public class HierarchicalJob extends Configured implements Tool {
     protected static int migrationFrequency;
     protected static int migrationNumber;
     protected static float mutationChance;
+    protected static int noImprovementCount;
 
     @Override
 	public int run(String[] args) throws Exception {
@@ -57,7 +58,7 @@ public class HierarchicalJob extends Configured implements Tool {
     protected void readArgs(String[] args) {
     	/* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
         <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
-        <population filepath> <problem string> */
+        <population filepath> <problem string> <no improvement count> */
     	generation = Integer.valueOf(args[0]);
     	populationSize = Integer.valueOf(args[1]);
     	numSubPopulations = (int) Integer.valueOf(args[2]);
@@ -70,6 +71,7 @@ public class HierarchicalJob extends Configured implements Tool {
     	mutationChance = Float.valueOf(args[7]);
     	popPath = args[8];
     	problem = args[9];
+    	noImprovementCount = Integer.valueOf(args[10]);
     }
 
     protected void selectAndReproduce(int generation, String roadmap) throws Exception {
@@ -107,6 +109,7 @@ public class HierarchicalJob extends Configured implements Tool {
         for (int i = 0; i < lowerBounds.length; i++) {
         	conf.setFloat("lowerBound" + i, lowerBounds[i]);
         }
+
         return conf;
     }
 

@@ -70,7 +70,13 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 		config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
 		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1);
+
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
+		int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
+		for (; noImprovementCount > 20; noImprovementCount--) {
+			mutationChance += 0.01;
+		}
+
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
 		}

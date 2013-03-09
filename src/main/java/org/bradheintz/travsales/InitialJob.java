@@ -141,7 +141,7 @@ public abstract class InitialJob extends Configured implements Tool{
 
     private void iterate() throws Exception {
     	int generation = 0;
-        while (noImprovementCount < 50 && generation < maxGenerations) {
+        while (!convergenceCriteriaMet(generation)) {
             selectAndReproduce(generation, problem);
             ScoredChromosome bestChromosome = findMigrationBounds(generation);
             printBestIndividual(generation, bestChromosome);
@@ -154,6 +154,14 @@ public abstract class InitialJob extends Configured implements Tool{
             }
             generation++;
         }
+    }
+
+    protected boolean convergenceCriteriaMet(int generation) {
+    	if (noImprovementCount < 50 && generation < maxGenerations) {
+    		return false;
+    	} else {
+    		return true;
+    	}
     }
 
 	protected abstract String setUpInitialProblem(FSDataOutputStream fsDataOutputStream, Configuration conf)
@@ -211,6 +219,7 @@ public abstract class InitialJob extends Configured implements Tool{
         for (int i = 0; i < lowerBounds.length; i++) {
         	conf.setFloat("lowerBound" + i, lowerBounds[i]);
         }
+        conf.setInt("noImprovementCount", noImprovementCount);
         return conf;
     }
 
@@ -241,9 +250,9 @@ public abstract class InitialJob extends Configured implements Tool{
 
     /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
        <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
-       <population filepath> <problem string> */
+       <population filepath> <problem string> <no improvement count> */
     protected String[] fillArgs(int generation, int level) {
-    	String[] args = new String[10];
+    	String[] args = new String[11];
     	args[0] = String.valueOf(generation);
      	args[1] = String.valueOf(populationSize);
      	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels-level));
@@ -256,6 +265,7 @@ public abstract class InitialJob extends Configured implements Tool{
      	args[7] = String.valueOf(mutationChance);
      	args[8] = popPath;
      	args[9] = problem;
+     	args[10] = String.valueOf(noImprovementCount);
      	return args;
     }
 
