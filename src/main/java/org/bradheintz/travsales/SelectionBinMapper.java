@@ -33,19 +33,22 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	numSubPopulations = context.getConfiguration().getInt("numSubPopulations", 1);
     	int migrationRate = context.getConfiguration().getInt("migrationFrequency", 1);
     	int generation = context.getConfiguration().getInt("generation", 1);
+    	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 100);
     	boolean isMigrate = generation%migrationRate == 0 ? true : false;
 
     	double random = Math.random();
+    	double randomThreshold = 1/selectionBinSize;
 
-    	if (isMigrate && (sc.score > lowerBound || random == 0.0001)) {
+    	if (isMigrate && (sc.score > lowerBound || random <= randomThreshold)) {
     		switch (topology) {
     			case RING: ringBroadcast(sc, context); break;
     			case HYPERCUBE: hypercubeBroadcast(sc, context); break;
     		}
+    	} else {
+    		// Only send individual to current subpop if it hasn't migrated
+    		outKey.set(Integer.valueOf(key.toString()));
+    		context.write(outKey, value);
     	}
-    	// Always send key to it's own reducer (don't remove individuals from sub-populations here)
-    	outKey.set(Integer.valueOf(key.toString()));
-        context.write(outKey, value);
     }
 
     @Override
@@ -67,6 +70,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	}
     	context.write(currOutKey, value);
 
+    	// TODO migrate only to one subpop?
     	// Migrate to the right sub-population
     	if ((keyValue + 1) % selectionBinSize == 0) {
     		currOutKey.set(keyValue - selectionBinSize - 1);

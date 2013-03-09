@@ -9,6 +9,7 @@ import org.apache.hadoop.util.ToolRunner;
  *
  */
 public class TravSalesHierarchicalJob extends HierarchicalJob implements Tool {
+	private int numCities;
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new TravSalesHierarchicalJob(), args);
@@ -17,8 +18,14 @@ public class TravSalesHierarchicalJob extends HierarchicalJob implements Tool {
     @Override
     protected Configuration setConfigValues(Configuration conf) {
     	conf.set("cities", problem);
+    	conf.setInt("numCities", numCities);
     	return super.setConfigValues(conf);
     }
 
+    @Override
+    protected void readArgs(String[] args) {
+    	super.readArgs(args);
+    	numCities = Integer.valueOf(args[10]);
+    }
 
 }

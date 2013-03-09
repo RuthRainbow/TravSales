@@ -36,6 +36,7 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 	protected ChromosomeScorer scorer;
 	private Text outKey = new Text();
 	private DoubleWritable outValue = new DoubleWritable();
+	private Configuration config;
 
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
@@ -66,7 +67,7 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 	@Override
 	protected void setup(Context context) throws IOException, InterruptedException {
 		super.setup(context);
-		Configuration config = context.getConfiguration();
+		config = context.getConfiguration();
 		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
 		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1);
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
@@ -128,21 +129,40 @@ public abstract class SelectionReproductionReducer extends Reducer<VIntWritable,
 	protected abstract ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException;
 
 	protected ScoredChromosome crossover(ScoredChromosome parent1, ScoredChromosome parent2) {
-		int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
 		ScoredChromosome offspring = new ScoredChromosome();
 
-		StringBuilder newChromosome = new StringBuilder();
-		for (int i = 0; i < crossoverPoint; ++i) {
-			newChromosome.append(parent1.getChromosomeArray()[i]);
-			newChromosome.append(" ");
+		// Random offspring generation to avoid premature convergence if parents equivalent
+		if (parent2.chromosome == parent1.chromosome) {
+			offspring.chromosome = randomlyGenerateChromosome();
+		} else {
+
+			int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
+			StringBuilder newChromosome = new StringBuilder();
+			for (int i = 0; i < crossoverPoint; ++i) {
+				newChromosome.append(parent1.getChromosomeArray()[i]);
+				newChromosome.append(" ");
+			}
+			for (int j = crossoverPoint; j < parent2.getChromosomeArray().length; ++j) {
+				newChromosome.append(parent2.getChromosomeArray()[j]);
+				newChromosome.append(" ");
+			}
+			offspring.chromosome = newChromosome.toString().trim();
 		}
-		for (int j = crossoverPoint; j < parent2.getChromosomeArray().length; ++j) {
-			newChromosome.append(parent2.getChromosomeArray()[j]);
-			newChromosome.append(" ");
-		}
-		offspring.chromosome = newChromosome.toString().trim();
 
 		return offspring;
+	}
+
+	private String randomlyGenerateChromosome() {
+		int numCities = config.getInt("numCities", 20);
+		StringBuilder newChromosome = new StringBuilder();
+		for (int j = 0; j < (numCities - 1); ++j) {
+            if (j > 0) {
+                newChromosome.append(" ");
+            }
+            newChromosome.append(String.format("%d", random.nextInt(numCities - j)));
+        }
+
+		return newChromosome.toString();
 	}
 
 	protected void mutate(ScoredChromosome offspring) {

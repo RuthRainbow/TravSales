@@ -48,25 +48,29 @@ public class HierarchicalJob extends Configured implements Tool {
 	public int run(String[] args) throws Exception {
 		config = new Configuration();
 
-        /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
-           <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
-           <population filepath> <problem string> */
-        generation = Integer.valueOf(args[0]);
-        populationSize = Integer.valueOf(args[1]);
-        numSubPopulations = (int) Integer.valueOf(args[2]);
-        selectionBinSize = (int) populationSize/numSubPopulations;
-        lowerBounds = new float[numSubPopulations];
-        hierarchyLevel = Integer.valueOf(args[3]);
-        finalHierarchyLevel = Boolean.valueOf(args[4]);
-        migrationFrequency = Integer.valueOf(args[5]);
-        migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[6]));
-        mutationChance = Float.valueOf(args[7]);
-        popPath = args[8];
-        problem = args[9];
+		readArgs(args);
 
         selectAndReproduce(generation, problem);
 		return 0;
 	}
+
+    protected void readArgs(String[] args) {
+    	/* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
+        <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
+        <population filepath> <problem string> */
+    	generation = Integer.valueOf(args[0]);
+    	populationSize = Integer.valueOf(args[1]);
+    	numSubPopulations = (int) Integer.valueOf(args[2]);
+    	selectionBinSize = (int) populationSize/numSubPopulations;
+    	lowerBounds = new float[numSubPopulations];
+    	hierarchyLevel = Integer.valueOf(args[3]);
+    	finalHierarchyLevel = Boolean.valueOf(args[4]);
+    	migrationFrequency = Integer.valueOf(args[5]);
+    	migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[6]));
+    	mutationChance = Float.valueOf(args[7]);
+    	popPath = args[8];
+    	problem = args[9];
+    }
 
     protected void selectAndReproduce(int generation, String roadmap) throws Exception {
     	findMigrationBounds(generation);
