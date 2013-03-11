@@ -70,10 +70,10 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1);
 
 		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
-		int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
-		for (; noImprovementCount > 20; noImprovementCount--) {
-			mutationChance += 0.01;
-		}
+		//int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
+		//for (; noImprovementCount > 20; noImprovementCount--) {
+		//	mutationChance += 0.01;
+		//}
 
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
@@ -95,15 +95,12 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
 		Iterator<Text> iter = scoredChromosomeStrings.iterator();
 
-		int count = 0;
 		while (iter.hasNext()) {
-			count++;
 			Text chromosomeToParse = iter.next();
 			ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
 			if (sortedChromosomes.add(sc)) sideEffectSum += sc.getScore();
 			log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore(), sideEffectSum));
 		}
-		System.out.println(" OK THE NUMBER OF VALUES WAS " + count);
 
 		return sortedChromosomes;
 	}
@@ -188,6 +185,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 				newChromosome.append(" ");
 			}
 			offspring.setChromosome(newChromosome.toString().trim());
+			//offspring.setChromosome(uniformCrossover(parent1, parent2));
 		}
 
 		return offspring;
@@ -202,6 +200,23 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
             }
             newChromosome.append(String.format("%d", random.nextInt(numCities - j)));
         }
+
+		return newChromosome.toString();
+	}
+
+	protected String uniformCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
+		StringBuilder newChromosome = new StringBuilder();
+		double random;
+		for (int i = 0; i < parent1.getChromosomeArray().length; i++) {
+			random = Math.random();
+			if (random < 0.5) {
+				newChromosome.append(parent1.getChromosomeArray()[i]);
+				newChromosome.append(" ");
+			} else {
+				newChromosome.append(parent2.getChromosomeArray()[i]);
+				newChromosome.append(" ");
+			}
+		}
 
 		return newChromosome.toString();
 	}
