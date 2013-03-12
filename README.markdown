@@ -17,7 +17,15 @@ This software is released under the [Apache License, version 2.0](http://www.apa
 See the TODO file in this directory for a sort of sketchy roadmap of intended improvements.
 ***
 
-My plan is to convert this into a hierarchical genetic algorithm. At the moment the implementation involves two jobs chained together.
+My plan is to convert this into a hierarchical genetic algorithm. The implementation starts from a single job, chaining a configurable number of hierarchical jobs.
+
+
+To compile:
+From the project directory run 'mvn clean compile assembly:single' (requires Maven!)
+
+To run:
+Start your Hadoop cluster, then run './hadoop -jar projectdirectory/target/TravSales...jar'
+
 
 ##Command line parameters
 -----

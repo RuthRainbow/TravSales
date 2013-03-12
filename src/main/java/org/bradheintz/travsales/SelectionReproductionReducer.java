@@ -41,6 +41,10 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
+		int noImprovementCount = config.getInt("noImprovementCount", 0);
+		if (noImprovementCount > 50) {
+			socialDisasterPacking(key, sortedChromosomes);
+		}
 		normalizeScores(sortedChromosomes);
 
 		int survivorsWanted = (int) Math.ceil(sortedChromosomes.size() * survivorProportion);
@@ -62,14 +66,35 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		}
 	}
 
+	private void socialDisasterPacking(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes) {
+		ScoredChromosome bestChrom = sortedChromosomes.last();
+		double bestScore = bestChrom.getScore();
+		double eliminateFitness = bestScore;
+		do {
+			sortedChromosomes.remove(sortedChromosomes.last());
+			sortedChromosomes.add(new ScoredChromosome(randomlyGenerateChromosome()));
+			bestScore = sortedChromosomes.last().getScore();
+		} while (bestScore == eliminateFitness);
+		sortedChromosomes.add(bestChrom);
+	}
+
+	private void socialDisasterJudgementDay(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes) {
+		ScoredChromosome bestChrom = sortedChromosomes.last();
+		do {
+			sortedChromosomes.remove(sortedChromosomes.last());
+			sortedChromosomes.add(new ScoredChromosome(randomlyGenerateChromosome()));
+		} while (sortedChromosomes.size() > 1);
+		sortedChromosomes.add(bestChrom);
+	}
+
 	@Override
 	protected void setup(Context context) throws IOException, InterruptedException {
 		super.setup(context);
 		config = context.getConfiguration();
-		survivorProportion = context.getConfiguration().getFloat("survivorProportion", 0.3f);
-		desiredPopulationSize = context.getConfiguration().getInt("selectionBinSize", 1);
+		survivorProportion = config.getFloat("survivorProportion", 0.3f);
+		desiredPopulationSize = config.getInt("selectionBinSize", 1);
 
-		mutationChance = context.getConfiguration().getFloat("mutationChance", 0.01f);
+		mutationChance = config.getFloat("mutationChance", 0.01f);
 		//int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
 		//for (; noImprovementCount > 20; noImprovementCount--) {
 		//	mutationChance += 0.01;

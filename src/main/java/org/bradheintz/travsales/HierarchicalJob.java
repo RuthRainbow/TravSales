@@ -3,11 +3,6 @@ package org.bradheintz.travsales;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -39,7 +34,7 @@ public class HierarchicalJob extends Configured implements Tool {
     protected static int numSubPopulations;
     protected static int hierarchyLevel;
     protected static boolean finalHierarchyLevel;
-    protected static float[] lowerBounds;
+    private static SubpopulationStats[] stats;
     protected static int migrationFrequency;
     protected static int migrationNumber;
     protected static float mutationChance;
@@ -63,7 +58,10 @@ public class HierarchicalJob extends Configured implements Tool {
     	populationSize = Integer.valueOf(args[1]);
     	numSubPopulations = (int) Integer.valueOf(args[2]);
     	selectionBinSize = (int) populationSize/numSubPopulations;
-    	lowerBounds = new float[numSubPopulations];
+    	stats = new SubpopulationStats[numSubPopulations];
+    	for (int i = 0; i < numSubPopulations; i++) {
+    		stats[i] = new SubpopulationStats();
+    	}
     	hierarchyLevel = Integer.valueOf(args[3]);
     	finalHierarchyLevel = Boolean.valueOf(args[4]);
     	migrationFrequency = Integer.valueOf(args[5]);
@@ -106,8 +104,8 @@ public class HierarchicalJob extends Configured implements Tool {
         conf.setInt("generation", generation);
         conf.setEnum("topology", topology);
         conf.setInt("populationSize", populationSize);
-        for (int i = 0; i < lowerBounds.length; i++) {
-        	conf.setFloat("lowerBound" + i, lowerBounds[i]);
+        for (int i = 0; i < stats.length; i++) {
+        	conf.setFloat("lowerBound" + i, stats[i].lowerBound);
         }
         conf.setInt("noImprovementCount", noImprovementCount);
         conf.setInt("hierarchyLevel", hierarchyLevel);
@@ -130,60 +128,49 @@ public class HierarchicalJob extends Configured implements Tool {
         return job;
     }
 
-    // Finds the lower bound on migration for every sub-population
-    private static ScoredChromosome findMigrationBounds(int generation) throws IOException {
-    	String inputPath = popPath + String.format("/tmp_%d_%d/part-r-00000", generation, hierarchyLevel-1);
+ // Finds the lower bound on migration for every sub-population
+    protected ScoredChromosome findMigrationBounds(int generation) throws IOException {
+    	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));
     	ScoredChromosome bestChromosome = null;
-    	Map<Integer, List<ScoredChromosome>> bestChromosomes =
-    			new HashMap<Integer, List<ScoredChromosome>>();
     	int pos = 0;
     	int currSubPop = pos % numSubPopulations;
+    	double currWorstScore = Double.MAX_VALUE;
+
+    	for (int i = 0; i < numSubPopulations; i++) {
+    		stats[i].reset();
+    	}
 
         try {
             String line = br.readLine();
 
             while (line != null) {
             	currSubPop = pos % numSubPopulations;
-            	String[] fields = line.split("\t");
-            	double fitness = Double.valueOf(fields[1]);
+            	ScoredChromosome currChromosome = new ScoredChromosome(line);
+            	double fitness = currChromosome.getScore();
 
-            	if (!bestChromosomes.containsKey(currSubPop)) {
-            		bestChromosomes.put(currSubPop, new ArrayList<ScoredChromosome>());
-            	}
             	if (bestChromosome == null) {
             		bestChromosome = new ScoredChromosome(line);
             	}
 
-            	if (bestChromosomes.get(currSubPop).size() < migrationNumber) {
-            		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
-            		ScoredChromosome currChromosome = new ScoredChromosome(line);
-            		currList.add(currChromosome);
-            		bestChromosomes.put(currSubPop, currList);
-            		lowerBounds[currSubPop] = (float) fitness;
+            	stats[currSubPop].add(currChromosome, migrationNumber);
 
-            		if (currChromosome.getScore() > bestChromosome.getScore()) {
-            			bestChromosome = currChromosome;
-            		}
-            	} else if (fitness > lowerBounds[currSubPop]) {
-            		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
-            		ScoredChromosome currChromosome = new ScoredChromosome(line);
-            		currList.add(currChromosome);
-            		Collections.sort(currList);
-            		System.out.println("migration number is " + migrationNumber);
-            		currList.remove(migrationNumber);
-            		bestChromosomes.put(currSubPop, currList);
-            		lowerBounds[currSubPop] = currList.get(migrationNumber-1).getScore().floatValue();
-
-            		if (currChromosome.getScore() > bestChromosome.getScore()) {
-            			bestChromosome = currChromosome;
-            		}
+            	if (currChromosome.getScore() > bestChromosome.getScore()) {
+            		bestChromosome = currChromosome;
             	}
-                line = br.readLine();
-                pos++;
+
+            	if (fitness < currWorstScore) {
+            		currWorstScore = fitness;
+            	}
+            	line = br.readLine();
+            	pos++;
             }
+
+        	for (int i = 0; i < numSubPopulations; i++) {
+        		stats[i].calculate();
+        	}
         } finally {
-            br.close();
+        	br.close();
         }
 
         return bestChromosome;

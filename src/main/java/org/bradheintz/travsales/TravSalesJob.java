@@ -162,7 +162,6 @@ public class TravSalesJob extends InitialJob implements Tool {
     	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
     	// TODO maybe this doesn't work well for many hierarchies - in parallel?
      	args[5] = String.valueOf(migrationFrequency * level * 3);
-     	System.out.println("migration perfcentage is " + migrationPercentage);
      	args[6] = String.valueOf(migrationPercentage);
     	args[7] = String.valueOf(mutationChance);
     	args[8] = popPath;
