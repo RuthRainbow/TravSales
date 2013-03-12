@@ -25,7 +25,7 @@ public class TravSalesHierarchicalJob extends HierarchicalJob implements Tool {
     @Override
     protected void readArgs(String[] args) {
     	super.readArgs(args);
-    	numCities = Integer.valueOf(args[10]);
+    	numCities = Integer.valueOf(args[11]);
     }
 
 }

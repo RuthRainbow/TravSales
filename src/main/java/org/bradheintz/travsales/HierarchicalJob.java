@@ -67,8 +67,8 @@ public class HierarchicalJob extends Configured implements Tool {
     	hierarchyLevel = Integer.valueOf(args[3]);
     	finalHierarchyLevel = Boolean.valueOf(args[4]);
     	migrationFrequency = Integer.valueOf(args[5]);
-    	migrationNumber = (int) Math.floor(populationSize * Float.valueOf(args[6]));
-    	mutationChance = Float.valueOf(args[7]);
+    	migrationNumber = (int) Math.floor(populationSize * Float.parseFloat(args[6]));
+    	mutationChance = Float.parseFloat(args[7]);
     	popPath = args[8];
     	problem = args[9];
     	noImprovementCount = Integer.valueOf(args[10]);
@@ -170,6 +170,7 @@ public class HierarchicalJob extends Configured implements Tool {
             		ScoredChromosome currChromosome = new ScoredChromosome(line);
             		currList.add(currChromosome);
             		Collections.sort(currList);
+            		System.out.println("migration number is " + migrationNumber);
             		currList.remove(migrationNumber);
             		bestChromosomes.put(currSubPop, currList);
             		lowerBounds[currSubPop] = currList.get(migrationNumber-1).getScore().floatValue();

@@ -48,7 +48,7 @@ public abstract class InitialJob extends Configured implements Tool{
     protected static int selectionBinSize;
     protected static int numSubPopulations;
     protected static int maxGenerations = 500;
-    protected static int numHierarchyLevels = 1;
+    protected static int numHierarchyLevels = 2;
     protected static float mutationChance = 0.01f;
     protected static int migrationFrequency = 3;
     protected static float migrationPercentage = 0.0003f;
@@ -276,7 +276,7 @@ public abstract class InitialJob extends Configured implements Tool{
     	args[0] = String.valueOf(generation);
      	args[1] = String.valueOf(populationSize);
      	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels - level));
-     	args[3] = String.valueOf(level);
+     	args[3] = String.valueOf(level+1);
      	// hierarchy indexes start from 0
      	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
      	// TODO maybe this doesn't work well for many hierarchies - in parallel?
@@ -357,7 +357,7 @@ public abstract class InitialJob extends Configured implements Tool{
 	}
 
 	private float checkValid(float num, Option parameter) {
-		if (num > 1) {
+		if (num > 1 || num < 0) {
 			System.out.println("Incorrect formatting - parameter " + parameter + " must be a float between 0 and 1");
 			System.exit(1);
 		}
@@ -451,6 +451,7 @@ public abstract class InitialJob extends Configured implements Tool{
             		List<ScoredChromosome> currList = bestChromosomes.get(currSubPop);
             		currList.add(currChromosome);
             		Collections.sort(currList);
+            		System.out.println("migration number is " + migrationNumber);
             		currList.remove(migrationNumber);
             		bestChromosomes.put(currSubPop, currList);
             		lowerBounds[currSubPop] = currList.get(migrationNumber-1).getScore().floatValue();

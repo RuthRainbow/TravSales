@@ -150,10 +150,10 @@ public class TravSalesJob extends InitialJob implements Tool {
 
     /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
     <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
-    <population filepath> <problem string> <numCities> */
+    <population filepath> <problem string> <numCities> <no improvement count>*/
     @Override
     protected String[] fillArgs(int generation, int level) {
-    	String[] args = new String[11];
+    	String[] args = new String[12];
     	args[0] = String.valueOf(generation);
     	args[1] = String.valueOf(populationSize);
     	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels-level));
@@ -161,12 +161,14 @@ public class TravSalesJob extends InitialJob implements Tool {
     	args[3] = String.valueOf(level+1);
     	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
     	// TODO maybe this doesn't work well for many hierarchies - in parallel?
-    	args[5] = String.valueOf(migrationFrequency * level);
-    	args[6] = String.valueOf(migrationPercentage * level);
+     	args[5] = String.valueOf(migrationFrequency * level * 3);
+     	System.out.println("migration perfcentage is " + migrationPercentage);
+     	args[6] = String.valueOf(migrationPercentage);
     	args[7] = String.valueOf(mutationChance);
     	args[8] = popPath;
     	args[9] = problem;
-    	args[10] = String.valueOf(numCities);
+    	args[10] = String.valueOf(noImprovementCount);
+    	args[11] = String.valueOf(numCities);
     	return args;
     }
 }
