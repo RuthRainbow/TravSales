@@ -42,8 +42,15 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
 		int noImprovementCount = config.getInt("noImprovementCount", 0);
-		if (noImprovementCount > 50) {
+		if (noImprovementCount % 100 == 0 && noImprovementCount != 0) {
 			socialDisasterPacking(key, sortedChromosomes);
+		}
+		// Ensure there are at least 5 individuals in the subpopulation
+		for (int i = sortedChromosomes.size(); i < 5; i++) {
+			ScoredChromosome randomChrom = new ScoredChromosome();
+			randomChrom.setChromosome(randomlyGenerateChromosome());
+			randomChrom.setScore(scorer.score(randomChrom.getChromosome()));
+			sortedChromosomes.add(randomChrom);
 		}
 		normalizeScores(sortedChromosomes);
 
@@ -66,23 +73,32 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		}
 	}
 
-	private void socialDisasterPacking(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes) {
+	private void socialDisasterPacking(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes)
+			throws InterruptedException {
 		ScoredChromosome bestChrom = sortedChromosomes.last();
 		double bestScore = bestChrom.getScore();
 		double eliminateFitness = bestScore;
 		do {
 			sortedChromosomes.remove(sortedChromosomes.last());
-			sortedChromosomes.add(new ScoredChromosome(randomlyGenerateChromosome()));
+			ScoredChromosome randomChrom = new ScoredChromosome();
+			randomChrom.setChromosome(randomlyGenerateChromosome());
+			randomChrom.setScore(scorer.score(randomChrom.getChromosome()));
+			sortedChromosomes.add(randomChrom);
 			bestScore = sortedChromosomes.last().getScore();
 		} while (bestScore == eliminateFitness);
 		sortedChromosomes.add(bestChrom);
 	}
 
-	private void socialDisasterJudgementDay(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes) {
+	// Very computationally expensive to score all these random new chromosomes
+	private void socialDisasterJudgementDay(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes)
+			throws InterruptedException {
 		ScoredChromosome bestChrom = sortedChromosomes.last();
 		do {
 			sortedChromosomes.remove(sortedChromosomes.last());
-			sortedChromosomes.add(new ScoredChromosome(randomlyGenerateChromosome()));
+			ScoredChromosome randomChrom = new ScoredChromosome();
+			randomChrom.setChromosome(randomlyGenerateChromosome());
+			randomChrom.setScore(scorer.score(randomChrom.getChromosome()));
+			sortedChromosomes.add(randomChrom);
 		} while (sortedChromosomes.size() > 1);
 		sortedChromosomes.add(bestChrom);
 	}
@@ -95,10 +111,10 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		desiredPopulationSize = config.getInt("selectionBinSize", 1);
 
 		mutationChance = config.getFloat("mutationChance", 0.01f);
-		//int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
-		//for (; noImprovementCount > 20; noImprovementCount--) {
-		//	mutationChance += 0.01;
-		//}
+		int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
+		for (; noImprovementCount > 20 && noImprovementCount < 50; noImprovementCount--) {
+			mutationChance += 0.01;
+		}
 
 		if (config.get("cities") == null) {
 			throw new InterruptedException("Failure! No city map.");
@@ -179,7 +195,6 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			if (hierarchyLevel != 0 || config.getBoolean("finalHierarchyLevel", true)) {
 				offspring.setScore(scorer.score(offspring.getChromosome()));
 			}
-
 			return offspring;
 		} catch (NullPointerException npe) {
 			log.error("*** NullPointerException in makeOffspring()");
@@ -198,19 +213,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		if (parent2.getChromosome() == parent1.getChromosome()) {
 			offspring.setChromosome(randomlyGenerateChromosome());
 		} else {
-
-			int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
-			StringBuilder newChromosome = new StringBuilder();
-			for (int i = 0; i < crossoverPoint; ++i) {
-				newChromosome.append(parent1.getChromosomeArray()[i]);
-				newChromosome.append(" ");
-			}
-			for (int j = crossoverPoint; j < parent2.getChromosomeArray().length; ++j) {
-				newChromosome.append(parent2.getChromosomeArray()[j]);
-				newChromosome.append(" ");
-			}
-			offspring.setChromosome(newChromosome.toString().trim());
-			//offspring.setChromosome(uniformCrossover(parent1, parent2));
+			offspring.setChromosome(singlePointCrossover(parent1, parent2));
 		}
 
 		return offspring;
@@ -229,7 +232,21 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		return newChromosome.toString();
 	}
 
-	protected String uniformCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
+	private String singlePointCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
+		int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
+		StringBuilder newChromosome = new StringBuilder();
+		for (int i = 0; i < crossoverPoint; ++i) {
+			newChromosome.append(parent1.getChromosomeArray()[i]);
+			newChromosome.append(" ");
+		}
+		for (int j = crossoverPoint; j < parent2.getChromosomeArray().length; ++j) {
+			newChromosome.append(parent2.getChromosomeArray()[j]);
+			newChromosome.append(" ");
+		}
+		return newChromosome.toString().trim();
+	}
+
+	private String uniformCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		StringBuilder newChromosome = new StringBuilder();
 		double random;
 		for (int i = 0; i < parent1.getChromosomeArray().length; i++) {
@@ -243,7 +260,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			}
 		}
 
-		return newChromosome.toString();
+		return newChromosome.toString().trim();
 	}
 
 	protected void mutate(ScoredChromosome offspring) {

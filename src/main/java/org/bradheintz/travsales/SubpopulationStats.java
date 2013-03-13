@@ -45,7 +45,7 @@ public class SubpopulationStats {
 	private void addThreshold(ScoredChromosome currChromosome, int migrationNumber) {
 		if (threshold.size() != migrationNumber) {
 			threshold.add(currChromosome);
-		} else {
+		} else if (migrationNumber > 0) {
 			Collections.sort(threshold);
 			ScoredChromosome removed = threshold.remove(migrationNumber - 1);
 			if (removed.getScore() != currChromosome.getScore()) {

@@ -159,8 +159,7 @@ public abstract class InitialJob extends Configured implements Tool{
     }
 
     protected boolean convergenceCriteriaMet(int generation) {
-    	//if (noImprovementCount < 100 && generation < maxGenerations) {
-    	if (generation < maxGenerations) {
+    	if (noImprovementCount < 50 && generation < maxGenerations) {
     		return false;
     	} else {
     		return true;
