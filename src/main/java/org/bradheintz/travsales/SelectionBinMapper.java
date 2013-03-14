@@ -34,7 +34,13 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	int migrationRate = context.getConfiguration().getInt("migrationFrequency", 1);
     	int generation = context.getConfiguration().getInt("generation", 1);
     	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 100);
-    	boolean isMigrate = generation%migrationRate == 0 ? true : false;
+
+    	boolean isMigrate;
+    	if (migrationRate == 0) {
+    		isMigrate = false;
+    	} else {
+    		isMigrate = generation%migrationRate == 0 ? true : false;
+    	}
 
     	double random = Math.random();
     	double randomThreshold = 1/selectionBinSize;
