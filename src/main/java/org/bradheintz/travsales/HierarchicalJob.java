@@ -24,7 +24,7 @@ public class HierarchicalJob extends Configured implements Tool {
 	private Configuration config;
 
     private static final float survivorProportion = 0.3f;
-    private static final Topology topology = Topology.HYPERCUBE;
+    private static final Topology topology = Topology.RING;
     protected static String problem;
 
     protected static String popPath;

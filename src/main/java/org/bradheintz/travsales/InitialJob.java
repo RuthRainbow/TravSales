@@ -36,10 +36,10 @@ public abstract class InitialJob extends Configured implements Tool{
 	protected static int numNodes;
 
     private static final float survivorProportion = 0.3f;
-    private static final Topology topology = Topology.RING;
+    private static final Topology topology = Topology.HYPERCUBE;
     private static final int hierarchyLevel = 0;
 
-    protected static int populationSize = 10000;
+    protected static int populationSize = 100000;
     protected static int selectionBinSize;
     protected static int numSubPopulations;
     protected static int maxGenerations = 500;
@@ -97,6 +97,7 @@ public abstract class InitialJob extends Configured implements Tool{
     	numSubPopulations = (int) Math.pow(10, numHierarchyLevels);
     	selectionBinSize = (int) populationSize/numSubPopulations;
     	migrationNumber = (int) Math.floor(populationSize * migrationPercentage);
+    	migrationFrequency *= numHierarchyLevels;
     	stats = new SubpopulationStats[numSubPopulations];
     	for (int i = 0; i < numSubPopulations; i++) {
     		stats[i] = new SubpopulationStats();
@@ -159,7 +160,7 @@ public abstract class InitialJob extends Configured implements Tool{
     }
 
     protected boolean convergenceCriteriaMet(int generation) {
-    	if (noImprovementCount < 300 && generation < maxGenerations) {
+    	if (noImprovementCount < 100 && generation < maxGenerations) {
     		return false;
     	} else {
     		return true;
@@ -277,7 +278,7 @@ public abstract class InitialJob extends Configured implements Tool{
      	// hierarchy indexes start from 0
      	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
      	// TODO maybe this doesn't work well for many hierarchies - in parallel?
-     	args[5] = String.valueOf(migrationFrequency * level * 3);
+     	args[5] = String.valueOf(migrationFrequency * (numHierarchyLevels-level));
      	args[6] = String.valueOf(migrationPercentage);
      	args[7] = String.valueOf(mutationChance);
      	args[8] = popPath;
