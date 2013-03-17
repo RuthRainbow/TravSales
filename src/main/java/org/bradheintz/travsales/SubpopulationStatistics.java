@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class SubpopulationStats {
+public class SubpopulationStatistics {
 
 	protected ScoredChromosome bestChrom;
 	protected ScoredChromosome worstChrom;
@@ -14,7 +14,7 @@ public class SubpopulationStats {
 	protected List<ScoredChromosome> threshold;
 	private int count;
 
-	public SubpopulationStats() {
+	public SubpopulationStatistics() {
 		threshold = new ArrayList<ScoredChromosome>();
 		bestChrom = new ScoredChromosome();
 		worstChrom = new ScoredChromosome();

@@ -20,7 +20,7 @@ import org.bradheintz.travsales.InitialJob.Topology;
  *
  * @author ruthking
  */
-public class HierarchicalJob extends Configured implements Tool {
+public abstract class HierarchicalJob extends Configured implements Tool {
 	private Configuration config;
 
     private static final float survivorProportion = 0.3f;
@@ -34,7 +34,7 @@ public class HierarchicalJob extends Configured implements Tool {
     protected static int numSubPopulations;
     protected static int hierarchyLevel;
     protected static boolean finalHierarchyLevel;
-    private static SubpopulationStats[] stats;
+    private static SubpopulationStatistics[] stats;
     protected static int migrationFrequency;
     protected static int migrationNumber;
     protected static float mutationChance;
@@ -43,7 +43,6 @@ public class HierarchicalJob extends Configured implements Tool {
     @Override
 	public int run(String[] args) throws Exception {
 		config = new Configuration();
-
 		readArgs(args);
 
         selectAndReproduce(generation, problem);
@@ -58,9 +57,9 @@ public class HierarchicalJob extends Configured implements Tool {
     	populationSize = Integer.valueOf(args[1]);
     	numSubPopulations = (int) Integer.valueOf(args[2]);
     	selectionBinSize = (int) populationSize/numSubPopulations;
-    	stats = new SubpopulationStats[numSubPopulations];
+    	stats = new SubpopulationStatistics[numSubPopulations];
     	for (int i = 0; i < numSubPopulations; i++) {
-    		stats[i] = new SubpopulationStats();
+    		stats[i] = new SubpopulationStatistics();
     	}
     	hierarchyLevel = Integer.valueOf(args[3]);
     	finalHierarchyLevel = Boolean.valueOf(args[4]);
@@ -110,6 +109,8 @@ public class HierarchicalJob extends Configured implements Tool {
         conf.setInt("noImprovementCount", noImprovementCount);
         conf.setInt("hierarchyLevel", hierarchyLevel);
         conf.setBoolean("finalHierarchyLevel", finalHierarchyLevel);
+        boolean isMigrate = migrationFrequency == 0 ? false : (generation%migrationFrequency == 0 ? true : false);
+        conf.setBoolean("isMigrate", isMigrate);
         return conf;
     }
 
@@ -121,14 +122,22 @@ public class HierarchicalJob extends Configured implements Tool {
         job.setOutputKeyClass(VIntWritable.class);
         job.setOutputValueClass(Text.class);
 
-        job.setJarByClass(TravSalesHierarchicalJob.class);
-        job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(SelectionReproductionReducer.class);
+        job.setJarByClass(setJarByClass());
+        job.setMapperClass(setMapperByClass());
+        job.setReducerClass(setReducerByClass());
 
         return job;
     }
 
- // Finds the lower bound on migration for every sub-population
+    protected abstract Class<? extends HierarchicalJob> setJarByClass();
+
+    protected Class<? extends SelectionBinMapper> setMapperByClass() {
+    	return SelectionBinMapper.class;
+    }
+
+    protected abstract Class<? extends SelectionReproductionReducer> setReducerByClass();
+
+	// Finds the lower bound on migration for every sub-population
     protected ScoredChromosome findMigrationBounds(int generation) throws IOException {
     	String inputPath = popPath + String.format("/population_%d_scored/part-r-00000", generation);
     	BufferedReader br = new BufferedReader(new FileReader(inputPath));

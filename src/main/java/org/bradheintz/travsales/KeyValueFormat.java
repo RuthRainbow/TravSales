@@ -17,6 +17,8 @@ import org.apache.hadoop.util.LineReader;
 
 /**
  * Extension of TextInputFormat to use position in file % number of sub-populations as key
+ *
+ * @author ruthking
  */
 public class KeyValueFormat extends TextInputFormat{
     @Override

@@ -12,12 +12,6 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
@@ -51,23 +45,6 @@ public class TravSalesJob extends InitialJob implements Tool {
     @Override
     protected String setPopPath() {
     	return popPath;
-    }
-
-
-    @Override
-    protected Job setUpInitialJob() throws IOException {
-    	Job job = new Job(initialConfig, "travsales");
-
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(DoubleWritable.class);
-
-        job.setJarByClass(TravSalesJob.class);
-        job.setMapperClass(ScoringMapper.class);
-
-        FileInputFormat.setInputPaths(job, new Path(popPath + "/population_0"));
-        FileOutputFormat.setOutputPath(job, new Path(popPath + "/tmp_0_0"));
-
-        return job;
     }
 
     // For TravSales the problem is the city map
@@ -170,4 +147,19 @@ public class TravSalesJob extends InitialJob implements Tool {
     	args[11] = String.valueOf(numCities);
     	return args;
     }
+
+	@Override
+	protected Class<? extends InitialJob> setJarByClass() {
+		return TravSalesJob.class;
+	}
+
+	@Override
+	protected Class<? extends SelectionReproductionReducer> setReducerByClass() {
+		return TravSalesReducer.class;
+	}
+
+	@Override
+	protected Class<? extends ScoringMapper> setInitialMapperClass() {
+		return TravSalesScoringMapper.class;
+	}
 }

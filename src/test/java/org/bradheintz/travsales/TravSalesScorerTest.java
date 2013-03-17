@@ -14,17 +14,17 @@ import org.testng.annotations.Test;
  *
  * @author bradheintz
  */
-public class ChromosomeScorerTest {
-    ChromosomeScorer scorer = null;
+public class TravSalesScorerTest {
+    TravSalesScorer scorer = null;
 
     @BeforeTest
     public void setup() throws InterruptedException {
-        scorer = new ChromosomeScorer("0.0,0.0;0.0,1.0;1.0,1.0");
+        scorer = new TravSalesScorer("0.0,0.0;0.0,1.0;1.0,1.0");
     }
 
     @Test
     public void getCitiesFromConfigurationString() {
-        ArrayList<double[]> cities = ChromosomeScorer.getCitiesFromString("0.0,0.0;0.0,1.0;1.0,1.0");
+        ArrayList<double[]> cities = TravSalesScorer.getCitiesFromString("0.0,0.0;0.0,1.0;1.0,1.0");
         Assert.assertEquals(cities.size(), 3);
         Assert.assertEquals(cities.get(0)[0], 0.0, 0.000001);
         Assert.assertEquals(cities.get(0)[1], 0.0, 0.000001);

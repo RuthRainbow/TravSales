@@ -17,26 +17,28 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.log4j.Logger;
 
 /**
- * Processes entire sub-populations in 5 steps:
+ * Processes entire sub-populations in 6 steps:
  * 1. Sort by fitness
- * 2. Normalise fitness scores
- * 3. Select survivors with a fitness above a threshold value
- * 4. Create offspring from survivors by choosing parents at random then performing crossover with a
- * chance of mutation (implementation handled by extending class)
- * 5. Write survivors and offspring to file
+ * 2. Check for social disaster
+ * 3. Normalise fitness scores
+ * 4. Select survivors. Probability of selection is weighted by fitness value.
+ * 5. Create offspring from survivors by choosing parents at random then performing crossover with a
+ * chance of mutation
+ * 6. Write survivors and offspring to context
+ *
+ * @author bradheintz, ruthking
  */
-public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Text, DoubleWritable> {
-
-	private final static Logger log = Logger.getLogger(SelectionReproductionReducer.class);
-	private double survivorProportion;
-	private int desiredPopulationSize;
+public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable, Text, Text, DoubleWritable>{
+	protected final static Logger log = Logger.getLogger(TravSalesReducer.class);
+	protected double survivorProportion;
+	protected int desiredPopulationSize;
 	protected double sideEffectSum = 0.0;
 	protected double mutationChance = 0.01;
 	protected Random random = new Random();
 	protected ChromosomeScorer scorer;
-	private Text outKey = new Text();
-	private DoubleWritable outValue = new DoubleWritable();
-	private Configuration config;
+	protected Text outKey = new Text();
+	protected DoubleWritable outValue = new DoubleWritable();
+	protected Configuration config;
 
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
@@ -116,14 +118,17 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 			mutationChance += 0.01;
 		}
 
-		if (config.get("cities") == null) {
-			throw new InterruptedException("Failure! No city map.");
-		}
-		scorer = new ChromosomeScorer(config.get("cities"));
-		if (scorer.cities.size() < 3) {
-			throw new InterruptedException("Failure! Invalid city map.");
+		checkProblemExists();
+		createScorer();
+	}
+
+	protected void checkProblemExists() throws InterruptedException {
+		if (config.get("problem") == null) {
+			throw new InterruptedException("Failure! No problem.");
 		}
 	}
+
+	protected abstract void createScorer() throws InterruptedException;
 
 	protected TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<Text> scoredChromosomeStrings) {
 		TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
@@ -219,18 +224,7 @@ public class SelectionReproductionReducer extends Reducer<VIntWritable, Text, Te
 		return offspring;
 	}
 
-	private String randomlyGenerateChromosome() {
-		int numCities = config.getInt("numCities", 20);
-		StringBuilder newChromosome = new StringBuilder();
-		for (int j = 0; j < (numCities - 1); ++j) {
-            if (j > 0) {
-                newChromosome.append(" ");
-            }
-            newChromosome.append(String.format("%d", random.nextInt(numCities - j)));
-        }
-
-		return newChromosome.toString();
-	}
+	protected abstract String randomlyGenerateChromosome();
 
 	private String singlePointCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;

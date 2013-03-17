@@ -6,6 +6,8 @@ import org.apache.hadoop.io.Text;
 
 /**
  * Class to hold chromosome-score pair and handle mutation.
+ *
+ * @author bradheintz, ruthking
  */
 public class ScoredChromosome implements Comparable<ScoredChromosome> {
 	private String chromosome;

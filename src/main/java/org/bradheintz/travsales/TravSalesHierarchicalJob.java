@@ -28,4 +28,14 @@ public class TravSalesHierarchicalJob extends HierarchicalJob implements Tool {
     	numCities = Integer.valueOf(args[11]);
     }
 
+	@Override
+	protected Class<? extends HierarchicalJob> setJarByClass() {
+		return TravSalesHierarchicalJob.class;
+	}
+
+	@Override
+	protected Class<? extends SelectionReproductionReducer> setReducerByClass() {
+		return TravSalesReducer.class;
+	}
+
 }

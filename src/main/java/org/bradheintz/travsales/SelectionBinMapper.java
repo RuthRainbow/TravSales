@@ -15,6 +15,8 @@ import org.bradheintz.travsales.InitialJob.Topology;
 /**
  * Sends values to reducers based on their sub-population index. Also handles migration between
  * sub-populations based on the topology.
+ *
+ * @author ruthking
  */
 public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable, Text> {
     private VIntWritable outKey = new VIntWritable();
@@ -31,16 +33,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	Topology topology = context.getConfiguration().getEnum("topology", Topology.RING);
     	float lowerBound = context.getConfiguration().getFloat("lowerBound" + keyValue, Float.MAX_VALUE);
     	numSubPopulations = context.getConfiguration().getInt("numSubPopulations", 1);
-    	int migrationRate = context.getConfiguration().getInt("migrationFrequency", 1);
-    	int generation = context.getConfiguration().getInt("generation", 1);
     	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 100);
-
-    	boolean isMigrate;
-    	if (migrationRate == 0) {
-    		isMigrate = false;
-    	} else {
-    		isMigrate = generation%migrationRate == 0 ? true : false;
-    	}
+    	boolean isMigrate = context.getConfiguration().getBoolean("isMigrate", false);
 
     	double random = Math.random();
     	double randomThreshold = 1/selectionBinSize;
@@ -50,11 +44,9 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     			case RING: ringBroadcast(sc, context); break;
     			case HYPERCUBE: hypercubeBroadcast(sc, context); break;
     		}
-    	} //else {
-    		// Only send individual to current subpop if it hasn't migrated
-    		outKey.set(Integer.valueOf(key.toString()));
-    		context.write(outKey, value);
-    	//}
+    	}
+    	outKey.set(Integer.valueOf(key.toString()));
+    	context.write(outKey, value);
     }
 
     @Override

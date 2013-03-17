@@ -17,7 +17,7 @@ import org.apache.hadoop.mapreduce.Mapper;
  *
  * @author bradheintz
  */
-public class ScoringMapper extends Mapper<LongWritable, Text, Text, DoubleWritable> {
+public abstract class ScoringMapper extends Mapper<LongWritable, Text, Text, DoubleWritable> {
 
     private Text outKey = new Text();
     private DoubleWritable outValue = new DoubleWritable();
@@ -51,9 +51,8 @@ public class ScoringMapper extends Mapper<LongWritable, Text, Text, DoubleWritab
     protected void setup(Context context) throws IOException, InterruptedException {
         super.setup(context);
         Configuration config = context.getConfiguration();
-
-	if (config.get("cities") == null) throw new InterruptedException("Failure! No city map.");
-        scorer = new ChromosomeScorer(config.get("cities"));
-	if (scorer.cities.size() < 3) throw new InterruptedException("Failure! Invalid city map.");
+        createScorer(config);
     }
+
+	protected abstract void createScorer(Configuration config) throws InterruptedException;
 }

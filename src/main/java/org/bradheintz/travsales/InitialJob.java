@@ -26,7 +26,7 @@ import org.apache.hadoop.util.ToolRunner;
 /**
  * The main job - to be implemented with the algorithm specifics
  *
- * @author ruthking
+ * @author bradheintz, ruthking
  */
 public abstract class InitialJob extends Configured implements Tool{
 
@@ -50,7 +50,7 @@ public abstract class InitialJob extends Configured implements Tool{
     protected static int migrationNumber;
     protected static String popPath = "genetic_algorithm_populations";
 
-    private static SubpopulationStats[] stats;
+    private static SubpopulationStatistics[] stats;
     protected double bestScoreCurrGen;
     protected int noImprovementCount;
     protected ScoredChromosome overallBestChromosome;
@@ -98,9 +98,9 @@ public abstract class InitialJob extends Configured implements Tool{
     	selectionBinSize = (int) populationSize/numSubPopulations;
     	migrationNumber = (int) Math.floor(populationSize * migrationPercentage);
     	migrationFrequency *= numHierarchyLevels;
-    	stats = new SubpopulationStats[numSubPopulations];
+    	stats = new SubpopulationStatistics[numSubPopulations];
     	for (int i = 0; i < numSubPopulations; i++) {
-    		stats[i] = new SubpopulationStats();
+    		stats[i] = new SubpopulationStatistics();
     	}
 
         FileSystem fs = FileSystem.get(initialConfig);
@@ -142,31 +142,6 @@ public abstract class InitialJob extends Configured implements Tool{
     	return conf;
     }
 
-    private void iterate() throws Exception {
-    	int generation = 0;
-        while (!convergenceCriteriaMet(generation)) {
-            selectAndReproduce(generation, problem);
-            ScoredChromosome bestChromosome = findMigrationBounds(generation);
-            printBestIndividual(generation, bestChromosome);
-            if (bestChromosome.getScore() > bestScoreCurrGen) {
-            	bestScoreCurrGen = bestChromosome.getScore();
-            	noImprovementCount = 0;
-            	overallBestChromosome = bestChromosome;
-            } else {
-            	noImprovementCount++;
-            }
-            generation++;
-        }
-    }
-
-    protected boolean convergenceCriteriaMet(int generation) {
-    	if (noImprovementCount < 100 && generation < maxGenerations) {
-    		return false;
-    	} else {
-    		return true;
-    	}
-    }
-
     private void appendCurrentResults(ScoredChromosome bestChromosome, int generation) {
     	try {
     	    PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(popPath + "/result", true)));
@@ -189,10 +164,38 @@ public abstract class InitialJob extends Configured implements Tool{
          job.setOutputKeyClass(Text.class);
          job.setOutputValueClass(DoubleWritable.class);
 
-         job.setJarByClass(TravSalesJob.class);
-         job.setMapperClass(ScoringMapper.class);
+         job.setJarByClass(setJarByClass());
+         job.setMapperClass(setInitialMapperClass());
 
          return job;
+    }
+
+	protected abstract Class<? extends InitialJob> setJarByClass();
+	protected abstract Class<? extends ScoringMapper> setInitialMapperClass();
+
+    private void iterate() throws Exception {
+    	int generation = 0;
+        while (!convergenceCriteriaMet(generation)) {
+            selectAndReproduce(generation, problem);
+            ScoredChromosome bestChromosome = findMigrationBounds(generation);
+            printBestIndividual(generation, bestChromosome);
+            if (bestChromosome.getScore() > bestScoreCurrGen) {
+            	bestScoreCurrGen = bestChromosome.getScore();
+            	noImprovementCount = 0;
+            	overallBestChromosome = bestChromosome;
+            } else {
+            	noImprovementCount++;
+            }
+            generation++;
+        }
+    }
+
+    protected boolean convergenceCriteriaMet(int generation) {
+    	if (noImprovementCount < 300 && generation < maxGenerations) {
+    		return false;
+    	} else {
+    		return true;
+    	}
     }
 
     private void selectAndReproduce(int generation, String problem2) throws Exception {
@@ -238,6 +241,8 @@ public abstract class InitialJob extends Configured implements Tool{
         conf.setInt("noImprovementCount", noImprovementCount);
         conf.setInt("hierarchyLevel", hierarchyLevel);
         conf.setBoolean("finalHierarchyLevel", hierarchyLevel + 1 == numHierarchyLevels);
+        boolean isMigrate = migrationFrequency == 0 ? false : (generation%migrationFrequency == 0 ? true : false);
+        conf.setBoolean("isMigrate", isMigrate);
         return conf;
     }
 
@@ -248,12 +253,18 @@ public abstract class InitialJob extends Configured implements Tool{
         job.setOutputKeyClass(VIntWritable.class);
         job.setOutputValueClass(Text.class);
 
-        job.setJarByClass(TravSalesJob.class);
-        job.setMapperClass(SelectionBinMapper.class);
-        job.setReducerClass(SelectionReproductionReducer.class);
+        job.setJarByClass(setJarByClass());
+        job.setMapperClass(setMapperByClass());
+        job.setReducerClass(setReducerByClass());
 
         return job;
     }
+
+    protected Class<? extends SelectionBinMapper> setMapperByClass() {
+    	return SelectionBinMapper.class;
+    }
+
+    protected abstract Class<? extends SelectionReproductionReducer> setReducerByClass();
 
     private void runLevels(int generation) throws Exception {
          for (int i = 1; i < numHierarchyLevels; i++) {

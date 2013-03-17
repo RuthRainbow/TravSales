@@ -17,7 +17,7 @@ import org.testng.annotations.Test;
  * @author bradheintz
  */
 public class SelectionReproductionReducerTest {
-	SelectionReproductionReducer reducer = new SelectionReproductionReducer();
+	SelectionReproductionReducer reducer = new TravSalesReducer();
 
     @Test
     public void scoredChromosomeConstruction() {
