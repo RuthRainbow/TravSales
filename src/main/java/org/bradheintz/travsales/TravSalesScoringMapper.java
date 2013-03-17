@@ -1,6 +1,7 @@
 package org.bradheintz.travsales;
 
 import org.apache.hadoop.conf.Configuration;
+import org.bradheintz.generalalgorithm.ScoringMapper;
 
 public class TravSalesScoringMapper extends ScoringMapper {
 

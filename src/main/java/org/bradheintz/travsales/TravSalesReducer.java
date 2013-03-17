@@ -1,5 +1,7 @@
 package org.bradheintz.travsales;
 
+import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
+
 
 /**
  * Implementation of SelectionReproductionReducer for the TravSales algorithm

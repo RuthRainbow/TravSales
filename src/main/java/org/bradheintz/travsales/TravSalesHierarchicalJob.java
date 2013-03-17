@@ -3,6 +3,8 @@ package org.bradheintz.travsales;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.bradheintz.generalalgorithm.HierarchicalJob;
+import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
 
 /**
  * The job that works for every hierarchy level except the innermost; called from TravSalesJob

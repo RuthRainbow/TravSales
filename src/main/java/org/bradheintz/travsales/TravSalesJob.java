@@ -14,6 +14,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.bradheintz.generalalgorithm.InitialJob;
+import org.bradheintz.generalalgorithm.ScoringMapper;
+import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
 
 /**
  * The main job - forms the innermost hierarchy level and calls all other levels.

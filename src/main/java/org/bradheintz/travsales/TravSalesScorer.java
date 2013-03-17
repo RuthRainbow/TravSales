@@ -6,6 +6,8 @@ package org.bradheintz.travsales;
 
 import java.util.ArrayList;
 
+import org.bradheintz.generalalgorithm.ChromosomeScorer;
+
 /**
  * The class that assigns chromosomes a fitness value.
  *
