@@ -25,7 +25,6 @@ As the algorithm runs output for each generation will be sent to standard out an
 
 ##Command line parameters
 -----
-* -numCities or -c : set the number of cities.  
 * -populationSize or -ps : set the population size (must be a multiple of 10).  
 * -maxNumGenerations or -g : set the maximum number of generations the algorithm iterates over.  
 * -numHierarchyLevels or -h : set the number of hierarchy levels.
