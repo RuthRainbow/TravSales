@@ -9,6 +9,8 @@ import java.util.Iterator;
 import java.util.TreeSet;
 
 import org.apache.hadoop.io.Text;
+import org.bradheintz.generalalgorithm.ScoredChromosome;
+import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

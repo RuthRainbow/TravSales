@@ -24,13 +24,16 @@ import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
  * @author bradheintz, ruthking
  */
 public class TravSalesJob extends InitialJob implements Tool {
-
+	// Random used in problem generation and to create initial random population
     private static Random random = new Random();
 
+    // Extra variable, specific to TSP, holding the number of cities
     private static final int numCities = 20;
 
+    // Customise the path to where the files are stored
     private static String popPath = "travsales_populations";
 
+    // Method to run this job, cleaning up the directory before and the intial temporary file after
     public static void main(String[] args) throws Exception {
     	FileUtils.deleteDirectory(new File(popPath));
         ToolRunner.run(new TravSalesJob(), args);
@@ -41,22 +44,25 @@ public class TravSalesJob extends InitialJob implements Tool {
     @Override
     protected Configuration setInitialConfigValues(Configuration conf) {
     	conf.set("cities", problem);
-    	conf.setInt("numCities", numCities);
     	return super.setInitialConfigValues(conf);
     }
 
+    // Override this to return the customised file path
     @Override
     protected String setPopPath() {
     	return popPath;
     }
 
-    // For TravSales the problem is the city map
+    /* For TravSales the problem is the city map and the number of cities is also needed by the
+     * reducer to randomly generate chromosomes */
     @Override
     protected Configuration setIterativeConfigValues(Configuration conf, int generation) {
     	conf.set("cities", problem);
+    	conf.setInt("numCities", numCities);
     	return super.setIterativeConfigValues(conf, generation);
     }
 
+    // Create the coordinate map of cities
     protected static ArrayList<double[]> createMap(int numCities) {
         ArrayList<double[]> roadmap = new ArrayList<double[]>(numCities);
         for (int i = 0; i < numCities; ++i) {
@@ -66,6 +72,7 @@ public class TravSalesJob extends InitialJob implements Tool {
         return roadmap;
     }
 
+    // Add cities to the map of cities and write this to the HDFS
     @Override
     protected String setUpInitialProblem(FSDataOutputStream hdfsOut, Configuration hadoopConfig)
     		throws IOException {
@@ -93,6 +100,7 @@ public class TravSalesJob extends InitialJob implements Tool {
         return configStringBuilder.toString();
     }
 
+    // Create the roadmap and write this to HDFS
     protected static String createRoadmap(FSDataOutputStream hdfsOut, Configuration hadoopConfig,
     		final int numCities) throws IOException {
         ArrayList<double[]> roadmap = createMap(numCities);
@@ -112,6 +120,7 @@ public class TravSalesJob extends InitialJob implements Tool {
         return configStringBuilder.toString();
     }
 
+    // Generate the initial population and write this to file
     @Override
     protected void createInitialPopulation(FSDataOutputStream populationOutfile,
     		final int populationSize) throws IOException {
@@ -128,29 +137,15 @@ public class TravSalesJob extends InitialJob implements Tool {
         populationOutfile.close();
     }
 
-    /* Args: <generation #> <population size> <# subpopulations> <hierarchy level>
-    <final hierarchy level?> <migration frequency> <migration percentage> <mutation chance>
-    <population filepath> <problem string> <numCities> <no improvement count>*/
+    // Add the number of cities to the default configuration
     @Override
-    protected String[] fillArgs(int generation, int level) {
-    	String[] args = new String[12];
-    	args[0] = String.valueOf(generation);
-    	args[1] = String.valueOf(populationSize);
-    	args[2] = String.valueOf((int) Math.pow(10, numHierarchyLevels-level));
-    	// hierarchy indexes start from 0
-    	args[3] = String.valueOf(level+1);
-    	args[4] = (level + 1 == numHierarchyLevels) ? String.valueOf(true) : String.valueOf(false);
-    	// TODO maybe this doesn't work well for many hierarchies - in parallel?
-     	args[5] = String.valueOf(migrationFrequency * level * 3);
-     	args[6] = String.valueOf(migrationPercentage);
-    	args[7] = String.valueOf(mutationChance);
-    	args[8] = popPath;
-    	args[9] = problem;
-    	args[10] = String.valueOf(noImprovementCount);
-    	args[11] = String.valueOf(numCities);
-    	return args;
+    protected Configuration createHierarchicalConfig(int generation, int level) {
+    	Configuration conf = super.createHierarchicalConfig(generation, level);
+    	conf.setInt("numCities", numCities);
+		return conf;
     }
 
+    // Set the specific job, reducer and scoring mapper classes for TravSales
 	@Override
 	protected Class<? extends InitialJob> setJarByClass() {
 		return TravSalesJob.class;

@@ -16,18 +16,20 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.util.LineReader;
 
 /**
- * Extension of TextInputFormat to use position in file % number of sub-populations as key
+ * Extension of TextInputFormat to use position in file mod number of sub-populations as key
  *
- * @author ruthking
+ * @author ruthking, user1707141
+ * (see http://stackoverflow.com/questions/13456050/custominputformat-generates-duplicate-keys)
  */
 public class KeyValueFormat extends TextInputFormat{
-    @Override
-   public RecordReader<LongWritable, Text> createRecordReader(InputSplit split, TaskAttemptContext context) {
+
+	@Override
+    public RecordReader<LongWritable, Text> createRecordReader(
+		   InputSplit split, TaskAttemptContext context) {
         return new KeyValueRecordReader();
     }
 
     public class KeyValueRecordReader extends RecordReader<LongWritable, Text>{
-
     	private LineReader in;
     	private LongWritable key;
     	private Text value = new Text();
@@ -71,7 +73,8 @@ public class KeyValueFormat extends TextInputFormat{
 			 final Path file = split.getPath();
 			 Configuration conf = context.getConfiguration();
 			 this.numSubPops = conf.getInt("numSubPopulations", 10);
-			 this.maxLineLength = conf.getInt("mapred.linerecordreader.maxlength",Integer.MAX_VALUE);
+			 this.maxLineLength = conf.getInt(
+					 "mapred.linerecordreader.maxlength",Integer.MAX_VALUE);
 			 FileSystem fs = file.getFileSystem(conf);
 			 start = split.getStart();
 			 end= start + split.getLength();
@@ -85,7 +88,8 @@ public class KeyValueFormat extends TextInputFormat{
 			 }
 			 in = new LineReader(filein,conf);
 			 if(skipFirstLine){
-			 	start += in.readLine(new Text(),0,(int)Math.min((long)Integer.MAX_VALUE, end - start));
+			 	start += in.readLine(
+			 			new Text(),0,(int)Math.min((long)Integer.MAX_VALUE, end - start));
 			 }
 			 this.pos = start;
 		}
@@ -95,6 +99,7 @@ public class KeyValueFormat extends TextInputFormat{
 			if (key == null) {
 				key = new LongWritable();
 			}
+			// Here the key is set as the position in file mod the number of subpopulations
 			key.set(pos%numSubPops);
 			if (value == null) {
 				value = new Text();
@@ -104,7 +109,8 @@ public class KeyValueFormat extends TextInputFormat{
 			int newSize = 0;
 			Text v = new Text();
 			while (pos < end) {
-				newSize = in.readLine(v, maxLineLength,Math.max((int)Math.min(Integer.MAX_VALUE, end-pos),maxLineLength));
+				newSize = in.readLine(v, maxLineLength,Math.max(
+						(int)Math.min(Integer.MAX_VALUE, end-pos),maxLineLength));
 				value.append(v.getBytes(),0, v.getLength());
 				value.append(endline.getBytes(),0, endline.getLength());
 				if (newSize == 0) {
@@ -126,5 +132,3 @@ public class KeyValueFormat extends TextInputFormat{
 
     }
 }
-
-

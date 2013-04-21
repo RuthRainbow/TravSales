@@ -33,21 +33,26 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 	protected final static Logger log = Logger.getLogger(TravSalesReducer.class);
 	protected double survivorProportion;
 	protected int desiredPopulationSize;
-	public double sideEffectSum = 0.0;
-	protected double mutationChance = 0.01;
+	protected double mutationChance;
 	protected Random random = new Random();
 	protected ChromosomeScorer scorer;
 	protected Text outKey = new Text();
 	protected DoubleWritable outValue = new DoubleWritable();
 	protected Configuration config;
+	// This variable is public as it is also needed in the test package
+	public double sideEffectSum = 0.0;
 
 	@Override
 	protected void reduce(VIntWritable key, Iterable<Text> values, Context context) throws InterruptedException, IOException {
+		// Sort the chromosomes by fitness
 		TreeSet<ScoredChromosome> sortedChromosomes = getSortedChromosomeSet(values);
+
+		// If there has been no improvement for 100 generations use the social disaster technique
 		int noImprovementCount = config.getInt("noImprovementCount", 0);
 		if (noImprovementCount % 100 == 0 && noImprovementCount != 0) {
-			socialDisasterPacking(key, sortedChromosomes);
+			socialDisaster(key, sortedChromosomes);
 		}
+
 		// Ensure there are at least 5 individuals in the subpopulation
 		for (int i = sortedChromosomes.size(); i < 5; i++) {
 			ScoredChromosome randomChrom = new ScoredChromosome();
@@ -55,20 +60,25 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 			randomChrom.setScore(scorer.score(randomChrom.getChromosome()));
 			sortedChromosomes.add(randomChrom);
 		}
+
+		// Normalise the fitness values
 		normalizeScores(sortedChromosomes);
 
+		// Select survivors from the subpopulations
 		int survivorsWanted = (int) Math.ceil(sortedChromosomes.size() * survivorProportion);
+		survivorsWanted = survivorsWanted == 0 ? 2 : survivorsWanted;
 		Set<ScoredChromosome> survivors = new HashSet<ScoredChromosome>(survivorsWanted);
 		while (survivors.size() < survivorsWanted) {
 			survivors.add(selectSurvivor(sortedChromosomes));
 		}
 
-		// TODO just use survivors for newPopulation - why not? avoid dupes, save making another collection
+		// Make offspring from survivors
 		ArrayList<ScoredChromosome> parentPool = new ArrayList<ScoredChromosome>(survivors);
 		while (survivors.size() < desiredPopulationSize) {
 			survivors.add(makeOffspring(parentPool));
 		}
 
+		// Write the subpopulation to the context
 		for (ScoredChromosome sc : survivors) {
 			outKey.set(sc.getChromosome());
 			outValue.set(sc.getScore());
@@ -76,6 +86,14 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		}
 	}
 
+	/* Override this method to choose a social disaster flavour - by default packing is used as it
+	 * is much faster */
+	protected void socialDisaster(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes)
+			throws InterruptedException {
+		socialDisasterPacking(key, sortedChromosomes);
+	}
+
+	// Packing - randomise all but one of the elite individuals
 	private void socialDisasterPacking(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes)
 			throws InterruptedException {
 		ScoredChromosome bestChrom = sortedChromosomes.last();
@@ -92,7 +110,8 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		sortedChromosomes.add(bestChrom);
 	}
 
-	// Very computationally expensive to score all these random new chromosomes
+	/* Judgement day - randomise all but one of all individuals. Very computationally expensive to
+	 * score all these random new chromosomes */
 	private void socialDisasterJudgementDay(VIntWritable key, TreeSet<ScoredChromosome> sortedChromosomes)
 			throws InterruptedException {
 		ScoredChromosome bestChrom = sortedChromosomes.last();
@@ -106,16 +125,19 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		sortedChromosomes.add(bestChrom);
 	}
 
+	// Setup by setting variables using context, checking the problem exists and creating the scorer
 	@Override
 	protected void setup(Context context) throws IOException, InterruptedException {
 		super.setup(context);
 		config = context.getConfiguration();
 		survivorProportion = config.getFloat("survivorProportion", 0.3f);
 		desiredPopulationSize = config.getInt("selectionBinSize", 1);
-
 		mutationChance = config.getFloat("mutationChance", 0.01f);
+
+		/* if there has been no improvement for 20 generations and there has not just been a social
+		 * disaster increment the mutation chance */
 		int noImprovementCount = context.getConfiguration().getInt("noImprovementCount", 0);
-		for (; noImprovementCount > 20 && noImprovementCount < 50; noImprovementCount--) {
+		for (; noImprovementCount > 20 && ((noImprovementCount%100) < 50); noImprovementCount--) {
 			mutationChance += 0.01;
 		}
 
@@ -123,35 +145,45 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		createScorer();
 	}
 
+	// Check the configuration contains a definition of the problem
 	protected void checkProblemExists() throws InterruptedException {
 		if (config.get("problem") == null) {
 			throw new InterruptedException("Failure! No problem.");
 		}
 	}
 
+	// Create a problem specific scorer - must be implemented
 	protected abstract void createScorer() throws InterruptedException;
 
-	public TreeSet<ScoredChromosome> getSortedChromosomeSet(Iterable<Text> scoredChromosomeStrings) {
-		TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(new Comparator<ScoredChromosome>() {
+	// Iterate through the values passed to the reducer, sorting by fitness
+	public TreeSet<ScoredChromosome> getSortedChromosomeSet(
+			Iterable<Text> scoredChromosomeStrings) {
+		TreeSet<ScoredChromosome> sortedChromosomes = new TreeSet<ScoredChromosome>(
+				new Comparator<ScoredChromosome>() {
 			@Override
 			public int compare(ScoredChromosome c1, ScoredChromosome c2) {
 				return c1.getScore().compareTo(c2.getScore());
 			}
 		});
 
-		sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set, even if it makes us feel dirty-in-a-bad-way
+		sideEffectSum = 0.0; // computing sum as a side effect saves us a pass over the set
 		Iterator<Text> iter = scoredChromosomeStrings.iterator();
 
 		while (iter.hasNext()) {
 			Text chromosomeToParse = iter.next();
 			ScoredChromosome sc = new ScoredChromosome(chromosomeToParse);
 			if (sortedChromosomes.add(sc)) sideEffectSum += sc.getScore();
-			log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore(), sideEffectSum));
+			log.debug(String.format("SORTING: chromosome: %s, score: %g, accnormscore: %g, SUM: %g",
+					sc.getChromosome(),
+					sc.getScore(),
+					sc.getAccumulatedNormalizedScore(),
+					sideEffectSum));
 		}
 
 		return sortedChromosomes;
 	}
 
+	// Normalise the fitness scores of the subpopulation
 	public void normalizeScores(Iterable<ScoredChromosome> scoredChromosomes) {
 		Iterator<ScoredChromosome> iter = scoredChromosomes.iterator();
 		double accumulatedScore = 0.0;
@@ -159,27 +191,35 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 			ScoredChromosome sc = iter.next();
 			accumulatedScore += sc.getScore() / sideEffectSum;
 			sc.setAccumulatedNormalizedScore(accumulatedScore);
-			log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore()));
+			log.debug(String.format("NORMALIZING: chromosome: %s, score: %g, accnormscore: %g",
+					sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore()));
 		}
 	}
 
-	protected ScoredChromosome selectSurvivor(Iterable<ScoredChromosome> scoredAndNormalizedChromosomes) {
+	// Select a survivor - selection weighted by fitness score
+	protected ScoredChromosome selectSurvivor(
+			Iterable<ScoredChromosome> scoredAndNormalizedChromosomes) {
 		double thresholdScore = random.nextDouble();
 		Iterator<ScoredChromosome> iter = scoredAndNormalizedChromosomes.iterator();
 		while (iter.hasNext()) {
 			ScoredChromosome sc = iter.next();
 			if (sc.getAccumulatedNormalizedScore() > thresholdScore) {
-				log.debug(String.format("SELECTING: chromosome: %s, score: %g, accnormscore: %g, threshold: %g", sc.getChromosome(), sc.getScore(), sc.getAccumulatedNormalizedScore(), thresholdScore));
+				log.debug(String.format("SELECTING: chromosome: %s, score: %g, accnormscore: %g, " +
+						"threshold: %g", sc.getChromosome(), sc.getScore(),
+						sc.getAccumulatedNormalizedScore(), thresholdScore));
 				return sc;
 			}
 		}
 
-		return null; // TODO LATER this is a horrible error condition, and I should do something about it
+		return null;
 	}
 
-	protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool) throws InterruptedException {
+	// Make offspring by randomly selecting two parents from the selected set of chromosomes
+	protected ScoredChromosome makeOffspring(ArrayList<ScoredChromosome> parentPool)
+			throws InterruptedException {
 		int parent1Index = random.nextInt(parentPool.size());
 		int parent2Index = parent1Index;
+		// Ensure the parents are not the same individual
 		while (parent2Index == parent1Index) {
 			parent2Index = random.nextInt(parentPool.size());
 		}
@@ -192,15 +232,19 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 			log.debug(String.format("PARENT 2: chromosome: %s, score: %g, accnormscore: %g",
 					parent2.getChromosome(), parent2.getScore(), parent2.getAccumulatedNormalizedScore()));
 
+			// Crossover the two selected parents
 			ScoredChromosome offspring = crossover(parent1, parent2);
+			// By random chance the offspring may be mutated
 			if (random.nextDouble() < mutationChance) {
 				mutate(offspring);
 			}
 
+			// If at the final hierarchy level score the chromosome
 			int hierarchyLevel = config.getInt("hierarchyLevel", 0);
 			if (hierarchyLevel != 0 || config.getBoolean("finalHierarchyLevel", true)) {
 				offspring.setScore(scorer.score(offspring.getChromosome()));
 			}
+
 			return offspring;
 		} catch (NullPointerException npe) {
 			log.error("*** NullPointerException in makeOffspring()");
@@ -212,6 +256,7 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		}
 	}
 
+	// Crossover the given parents - extend to change crossover method, by default single-point
 	protected ScoredChromosome crossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		ScoredChromosome offspring = new ScoredChromosome();
 
@@ -225,8 +270,10 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		return offspring;
 	}
 
+	// Randomly generate a chromosome - must be extended as problem specific
 	protected abstract String randomlyGenerateChromosome();
 
+	// Carry out single-point crossover on the given parents, choosing the crossover point at random
 	private String singlePointCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		int crossoverPoint = random.nextInt(parent1.getChromosomeArray().length - 1) + 1;
 		StringBuilder newChromosome = new StringBuilder();
@@ -241,6 +288,7 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		return newChromosome.toString().trim();
 	}
 
+	// Carry out uniform crossover on the given parents, with a mixing ratio of 0.5
 	private String uniformCrossover(ScoredChromosome parent1, ScoredChromosome parent2) {
 		StringBuilder newChromosome = new StringBuilder();
 		double random;
@@ -258,8 +306,10 @@ public abstract class SelectionReproductionReducer  extends Reducer<VIntWritable
 		return newChromosome.toString().trim();
 	}
 
+	// Mutate a random gene to a random value in the given chromosome
 	protected void mutate(ScoredChromosome offspring) {
 		int geneToMutate = random.nextInt(offspring.getChromosomeArray().length);
-		offspring.setGene(geneToMutate, random.nextInt(offspring.getChromosomeArray().length + 1 - geneToMutate));
+		offspring.setGene(geneToMutate, random.nextInt(
+				offspring.getChromosomeArray().length + 1 - geneToMutate));
 	}
 }

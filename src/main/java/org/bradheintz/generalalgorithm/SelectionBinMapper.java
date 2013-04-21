@@ -23,15 +23,19 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     private int numSubPopulations;
     private int keyValue;
     private Text value;
-    // The key is the sub-pop number, the value is the chromosome/score pair
+
+    // The key is the subpopulation identifier, the value is the chromosome/score pair
     @Override
     protected void map(LongWritable key, Text value, Context context)
     		throws IOException, InterruptedException {
     	ScoredChromosome sc = new ScoredChromosome(value);
     	keyValue = Integer.valueOf(key.toString());
     	this.value = value;
+
+    	// Get parameter values required from the configuration
     	Topology topology = context.getConfiguration().getEnum("topology", Topology.RING);
-    	float lowerBound = context.getConfiguration().getFloat("lowerBound" + keyValue, Float.MAX_VALUE);
+    	float lowerBound = context.getConfiguration().getFloat(
+    			"lowerBound" + keyValue, Float.MAX_VALUE);
     	numSubPopulations = context.getConfiguration().getInt("numSubPopulations", 1);
     	int selectionBinSize = context.getConfiguration().getInt("selectionBinSize", 100);
     	boolean isMigrate = context.getConfiguration().getBoolean("isMigrate", false);
@@ -39,12 +43,15 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	double random = Math.random();
     	double randomThreshold = 1/selectionBinSize;
 
+    	// Migrate if a migration generation and score is above threshold or through random chance
     	if (isMigrate && (sc.getScore() > lowerBound || random <= randomThreshold)) {
     		switch (topology) {
     			case RING: ringBroadcast(sc, context); break;
     			case HYPERCUBE: hypercubeBroadcast(sc, context); break;
     		}
     	}
+
+    	// Write the individual to its original subpopulation
     	outKey.set(Integer.valueOf(key.toString()));
     	context.write(outKey, value);
     }
@@ -54,13 +61,14 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
         super.setup(context);
     }
 
+    // Migrate given individual in a ring topology to neighbouring subpopulations
     private void ringBroadcast(ScoredChromosome sc, Context context)
     		throws IOException, InterruptedException {
     	VIntWritable currOutKey = new VIntWritable();
 
     	int numSubPops = context.getConfiguration().getInt("numSubPopulations", 10);
 
-    	// Migrate to the left sub-population
+    	// Migrate to the left subpopulation
     	if (keyValue % numSubPops == 0) {
     		currOutKey.set(keyValue + numSubPops - 1);
     	} else {
@@ -68,8 +76,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	}
     	context.write(currOutKey, value);
 
-    	// TODO migrate only to one subpop?
-    	// Migrate to the right sub-population
+    	// Migrate to the right subpopulation
     	if ((keyValue + 1) % numSubPops == 0) {
     		currOutKey.set(keyValue - numSubPops + 1);
     	} else {
@@ -78,6 +85,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	context.write(currOutKey, value);
     }
 
+    // Migrate given individual in a hypercube topology to neighbouring subpopulations
     private void hypercubeBroadcast(ScoredChromosome sc, Context context)
     		throws IOException, InterruptedException {
     	VIntWritable currOutKey = new VIntWritable();
@@ -103,6 +111,8 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	}
     }
 
+    /* Add leading zeroes to a string using a mutable StringBuilder so all strings are the same
+     * number of binary digits */
     private String addLeadingZeros(String binaryString, int numBinaryDigits) {
     	int strLength = binaryString.length();
     	StringBuilder strBuilder = new StringBuilder();
@@ -113,6 +123,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
 		return strBuilder.toString();
 	}
 
+    // Flip a binary digit
 	private char flipDigit(int i) {
     	if (i == '0') {
     		return '1';
@@ -121,6 +132,7 @@ public class SelectionBinMapper extends Mapper<LongWritable, Text, VIntWritable,
     	}
     }
 
+	// Convert a character array to a string
     private String charArrToString(char[] arr) {
     	StringBuilder strBuilder = new StringBuilder();
     	for (char c : arr) {

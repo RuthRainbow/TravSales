@@ -9,27 +9,23 @@ import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
 /**
  * The job that works for every hierarchy level except the innermost; called from TravSalesJob
  *
+ * @author ruthking
  */
 public class TravSalesHierarchicalJob extends HierarchicalJob implements Tool {
-	private int numCities;
 
+	// Run this hierarchical job
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new TravSalesHierarchicalJob(), args);
     }
 
+    // For TravSales the problem is the city map
     @Override
     protected Configuration setConfigValues(Configuration conf) {
     	conf.set("cities", problem);
-    	conf.setInt("numCities", numCities);
     	return super.setConfigValues(conf);
     }
 
-    @Override
-    protected void readArgs(String[] args) {
-    	super.readArgs(args);
-    	numCities = Integer.valueOf(args[11]);
-    }
-
+    // Set the specific job and reducer for TravSales
 	@Override
 	protected Class<? extends HierarchicalJob> setJarByClass() {
 		return TravSalesHierarchicalJob.class;

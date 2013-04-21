@@ -10,6 +10,7 @@ import org.bradheintz.generalalgorithm.SelectionReproductionReducer;
  */
 public class TravSalesReducer extends SelectionReproductionReducer {
 
+	// This method is overridden as the problem is the city map for TravSales
 	@Override
 	protected void checkProblemExists() throws InterruptedException {
 		if (config.get("cities") == null) {
@@ -17,11 +18,13 @@ public class TravSalesReducer extends SelectionReproductionReducer {
 		}
 	}
 
+	// Generate the TSP specific scorer using the city map
 	@Override
 	protected void createScorer() throws InterruptedException {
 		scorer = new TravSalesScorer(config.get("cities"));
 	}
 
+	// Randomly generate a chromosome, specific to TSP
 	protected String randomlyGenerateChromosome() {
 		int numCities = config.getInt("numCities", 20);
 		StringBuilder newChromosome = new StringBuilder();
