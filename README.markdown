@@ -25,15 +25,15 @@ As the algorithm runs output for each generation will be sent to standard out an
 
 ##Command line parameters
 -----
--numCities or -c : set the number of cities.  
--populationSize or -ps : set the population size (must be a multiple of 10).  
--maxNumGenerations or -g : set the maximum number of generations the algorithm iterates over.  
--numHierarchyLevels or -h : set the number of hierarchy levels.
--filepath or -f : set the filepath for the results of each generation to be stored in as well as for the temporary files created by each hierarchy level.  
--mutationChance or -mc : set the chance of mutation in the range [0.0, 1.0]. Must be a float.
--migrationRate or -mr : change the rate of migration, i.e. epoch length.
--migrationPercentage or -mp : change the percentage of individuals that migrate. Must be a float in the range [0.0, 1.0].
--survivorProportion or -sp : chance the proportion of individuals that survive each iteration. Must be a float in the range [0.0, 1.0].
+* -numCities or -c : set the number of cities.  
+* -populationSize or -ps : set the population size (must be a multiple of 10).  
+* -maxNumGenerations or -g : set the maximum number of generations the algorithm iterates over.  
+* -numHierarchyLevels or -h : set the number of hierarchy levels.
+* -filepath or -f : set the filepath for the results of each generation to be stored in as well as for the temporary files created by each hierarchy level.  
+* -mutationChance or -mc : set the chance of mutation in the range [0.0, 1.0]. Must be a float.
+* -migrationRate or -mr : change the rate of migration, i.e. epoch length.
+* -migrationPercentage or -mp : change the percentage of individuals that migrate. Must be a float in the range [0.0, 1.0].
+* -survivorProportion or -sp : chance the proportion of individuals that survive each iteration. Must be a float in the range [0.0, 1.0].
 
 ##License
 -------
